@@ -271,13 +271,6 @@
       overflow: hidden;
     }
     
-    .channel-card-main {
-      display: table;
-      width: 100%;
-      padding: 10px 16px;
-      min-height: 68px;
-    }
-
     .channel-card:hover {
       background: var(--bg-card-hover);
       border-color: rgba(255, 61, 113, 0.3);
@@ -285,12 +278,6 @@
     
     .channel-card.expanded {
       border-color: rgba(255, 61, 113, 0.5);
-    }
-
-    .channel-card-main > * {
-      display: table-cell;
-      vertical-align: middle;
-      padding: 4px 8px;
     }
 
     .rank {
@@ -339,12 +326,46 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 200px;
+      max-width: 180px;
+      flex-shrink: 0;
+    }
+    
+    .channel-card-main {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      min-height: 68px;
+      width: 100%;
+    }
+    
+    .channel-card-main > * {
+      flex-shrink: 0;
+    }
+    
+    .channel-card-main .rank {
+      width: 36px;
+      text-align: center;
+    }
+    
+    .channel-card-main .channel-name {
+      flex: 1;
+      min-width: 0;
+      margin-right: auto;
+    }
+    
+    .channel-card-main .channel-stat {
+      width: 90px;
+      text-align: right;
+    }
+    
+    .channel-card-main .live-badge {
+      margin-left: 0;
     }
 
     .channel-stat {
       width: 90px;
-      text-align: center;
+      text-align: right;
     }
 
     .stat-num {
@@ -377,6 +398,47 @@
       font-size: 10px;
       font-weight: 500;
       color: var(--accent-primary);
+    }
+    
+    /* Channel Flags */
+    .channel-flags {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    
+    .channel-flag {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: none;
+    }
+    
+    .channel-flag input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: var(--accent-primary);
+    }
+    
+    .channel-flag:hover {
+      color: var(--text-primary);
+    }
+    
+    .channel-flag.live-monitor {
+      color: var(--accent-primary);
+    }
+    
+    .channel-flag.exclude-flag {
+      color: var(--warning);
+    }
+    
+    .detail-item .channel-flags {
+      margin-top: 4px;
     }
     
     /* Channel Detail Section */
@@ -681,12 +743,22 @@
       .channel-card-main {
         padding: 8px 10px;
         min-height: 56px;
+        gap: 6px;
       }
       
       .channel-avatar,
       .channel-card-main > img.channel-avatar {
         width: 40px;
         height: 40px;
+      }
+      
+      .channel-name {
+        max-width: 100px;
+      }
+      
+      .channel-flags {
+        flex-direction: column;
+        gap: 8px;
       }
       
       .channel-stat:nth-child(n+5) {
@@ -778,10 +850,11 @@
     <!-- Controls -->
     <div class="controls">
       <div class="tabs">
-        <button class="tab-btn active" data-sort="maxViewerCount">最大同接</button>
-        <button class="tab-btn" data-sort="subscriberCount">登録者数</button>
-        <button class="tab-btn" data-sort="avgViewCount">平均再生</button>
-        <button class="tab-btn" data-sort="uploadFrequency">投稿頻度</button>
+        <button class="tab-btn active" data-sort="maxViewerCount" data-filter="normal">最大同接</button>
+        <button class="tab-btn" data-sort="subscriberCount" data-filter="normal">登録者数</button>
+        <button class="tab-btn" data-sort="avgViewCount" data-filter="normal">平均再生</button>
+        <button class="tab-btn" data-sort="uploadFrequency" data-filter="normal">投稿頻度</button>
+        <button class="tab-btn" data-sort="maxViewerCount" data-filter="excluded">除外者</button>
       </div>
     </div>
     
@@ -818,6 +891,7 @@
     let currentSearch = '';
     let totalPages = 1;
     let expandAllOnSearch = false;
+    let currentFilter = 'normal'; // 'normal' or 'excluded'
     
     // Format number with K/M suffix
     function formatNumber(num) {
@@ -909,7 +983,8 @@
           limit: 50,
           sortBy: currentSort,
           sortOrder: 'desc',
-          search: currentSearch
+          search: currentSearch,
+          showExcluded: currentFilter === 'excluded' ? 'true' : 'false'
         };
         
         const data = await runServerFunction('getChannelsForClient', params);
@@ -982,6 +1057,16 @@
             '<div class="detail-item"><div class="detail-label">最大同時接続数</div><div class="detail-value">' + formatNumber(ch.maxViewerCount) + '人' + (ch.maxViewerCountDate && ch.maxViewerCountDate !== '' ? ' (' + escapeHtml(formatDate(ch.maxViewerCountDate)) + ')' : '') + '</div></div>' +
             '<div class="detail-item"><div class="detail-label">最終投稿日</div><div class="detail-value">' + (ch.lastPublishedAt ? escapeHtml(formatDate(ch.lastPublishedAt)) : 'N/A') + '</div></div>' +
             '<div class="detail-item detail-description"><div class="detail-label">チャンネル説明文</div><div class="detail-value">' + escapeHtmlWithBreaks(description) + '</div></div>' +
+            '<div class="detail-item"><div class="detail-label">設定</div><div class="detail-value"><div class="channel-flags">' +
+            '<label class="channel-flag live-monitor" onclick="event.stopPropagation()">' +
+            '<input type="checkbox" class="flag-live-monitor" data-channel-id="' + escapeHtml(ch.channelId) + '" ' + (ch.liveMonitor ? 'checked' : '') + '>' +
+            '<span>ライブ配信監視</span>' +
+            '</label>' +
+            '<label class="channel-flag exclude-flag" onclick="event.stopPropagation()">' +
+            '<input type="checkbox" class="flag-exclude" data-channel-id="' + escapeHtml(ch.channelId) + '" ' + (ch.excludeFlag ? 'checked' : '') + '>' +
+            '<span>除外フラグ</span>' +
+            '</label>' +
+            '</div></div></div>' +
             '</div>' +
             '<div class="detail-actions">' +
             '<a href="' + url + '" target="_blank" class="detail-btn primary" onclick="event.stopPropagation()">YouTubeで開く</a>' +
@@ -995,10 +1080,85 @@
         document.querySelectorAll('.channel-card').forEach(card => {
           card.addEventListener('click', (e) => {
             // ボタンクリック時は詳細説明の開閉をしない
-            if (e.target.closest('.detail-btn')) {
+            if (e.target.closest('.detail-btn') || e.target.closest('.channel-flags') || e.target.closest('.channel-flag')) {
               return;
             }
             card.classList.toggle('expanded');
+          });
+        });
+        
+        // Add checkbox handlers
+        document.querySelectorAll('.flag-live-monitor').forEach(checkbox => {
+          checkbox.addEventListener('change', async (e) => {
+            e.stopPropagation();
+            const channelId = checkbox.getAttribute('data-channel-id');
+            const value = checkbox.checked;
+            
+            try {
+              const result = await runServerFunction('updateChannelFlagForClient', {
+                channelId: channelId,
+                flagType: 'liveMonitor',
+                value: value
+              });
+              
+              if (result.success) {
+                console.log('ライブ配信監視フラグを更新しました:', channelId, value);
+                // 統計情報を再読み込み
+                loadStats();
+              } else {
+                console.error('フラグ更新エラー:', result.error);
+                checkbox.checked = !value; // 元に戻す
+                alert('フラグの更新に失敗しました: ' + result.error);
+              }
+            } catch (error) {
+              console.error('フラグ更新エラー:', error);
+              checkbox.checked = !value; // 元に戻す
+              alert('フラグの更新に失敗しました');
+            }
+          });
+        });
+        
+        document.querySelectorAll('.flag-exclude').forEach(checkbox => {
+          checkbox.addEventListener('change', async (e) => {
+            e.stopPropagation();
+            const channelId = checkbox.getAttribute('data-channel-id');
+            const value = checkbox.checked;
+            
+            try {
+              const result = await runServerFunction('updateChannelFlagForClient', {
+                channelId: channelId,
+                flagType: 'excludeFlag',
+                value: value
+              });
+              
+              if (result.success) {
+                console.log('除外フラグを更新しました:', channelId, value);
+                // 除外フラグを変更した場合は、現在のフィルタに応じて再読み込み
+                if (currentFilter === 'normal' && value) {
+                  // 通常表示で除外フラグをONにした場合、そのカードを非表示にする
+                  const card = checkbox.closest('.channel-card');
+                  if (card) {
+                    card.style.display = 'none';
+                  }
+                } else if (currentFilter === 'excluded' && !value) {
+                  // 除外者表示で除外フラグをOFFにした場合、そのカードを非表示にする
+                  const card = checkbox.closest('.channel-card');
+                  if (card) {
+                    card.style.display = 'none';
+                  }
+                }
+                // 統計情報を再読み込み
+                loadStats();
+              } else {
+                console.error('フラグ更新エラー:', result.error);
+                checkbox.checked = !value; // 元に戻す
+                alert('フラグの更新に失敗しました: ' + result.error);
+              }
+            } catch (error) {
+              console.error('フラグ更新エラー:', error);
+              checkbox.checked = !value; // 元に戻す
+              alert('フラグの更新に失敗しました');
+            }
           });
         });
         
@@ -1124,7 +1284,8 @@
         btn.addEventListener('click', () => {
           document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
-          currentSort = btn.dataset.sort;
+          currentSort = btn.dataset.sort || currentSort;
+          currentFilter = btn.dataset.filter || 'normal';
           currentPage = 1;
           loadChannels();
         });

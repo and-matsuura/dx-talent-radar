@@ -44,6 +44,9 @@ function handleApiRequest(e) {
       case 'getLiveStreams':
         result = getLiveStreamsApi();
         break;
+      case 'updateChannelFlag':
+        result = updateChannelFlagApi(e.parameter);
+        break;
       default:
         result = { error: 'Unknown action' };
     }
@@ -80,6 +83,10 @@ function getChannelsApi(params) {
   
   Logger.log('Data rows: ' + data.length);
   
+  // フィルタモード（showExcluded: 除外者のみ表示, showAll: すべて表示, デフォルト: 除外者を非表示）
+  const showExcluded = params.showExcluded === 'true' || params.showExcluded === true;
+  const showAll = params.showAll === 'true' || params.showAll === true;
+  
   // チャンネルオブジェクトに変換（すべての値を安全な形式に変換）
   let channels = data.map((row, index) => ({
     rank: index + 1,
@@ -103,7 +110,19 @@ function getChannelsApi(params) {
     fetchedAt: formatDateValue(row[14]),
     maxViewerCount: Number(row[15]) || 0,
     maxViewerCountDate: formatDateValue(row[16])
-  })).filter(ch => ch.channelId && !ch.excludeFlag); // 空の行と除外フラグがtrueの行を除外
+  })).filter(ch => {
+    if (!ch.channelId) return false;
+    // 除外者のみ表示モード
+    if (showExcluded) {
+      return ch.excludeFlag === true;
+    }
+    // すべて表示モード
+    if (showAll) {
+      return true;
+    }
+    // デフォルト: 除外者を非表示
+    return !ch.excludeFlag;
+  });
   
   Logger.log('Channels after filter: ' + channels.length);
   
@@ -394,6 +413,92 @@ function getLiveStreamsForClient() {
     Logger.log('getLiveStreamsForClient error: ' + error.message);
     Logger.log('Stack: ' + error.stack);
     return { liveStreams: [], error: error.message };
+  }
+}
+
+/**
+ * チャンネルのフラグを更新するAPI
+ * @param {Object} params パラメータ（channelId, flagType, value）
+ * @return {Object} 更新結果
+ */
+function updateChannelFlagApi(params) {
+  Logger.log('updateChannelFlagApi called');
+  
+  try {
+    const channelId = params.channelId;
+    const flagType = params.flagType; // 'liveMonitor' or 'excludeFlag'
+    const value = params.value === 'true' || params.value === true;
+    
+    if (!channelId || !flagType) {
+      return { success: false, error: 'channelId and flagType are required' };
+    }
+    
+    const sheetManager = new SpreadsheetManager();
+    const sheet = sheetManager.sheet;
+    
+    // チャンネルIDで行を検索
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      return { success: false, error: 'No data found' };
+    }
+    
+    const data = sheet.getRange(2, 1, lastRow - 1, CONFIG.SHEET_HEADERS.length).getValues();
+    let targetRow = null;
+    
+    for (let i = 0; i < data.length; i++) {
+      if (data[i][3] === channelId) { // D列（チャンネルID）
+        targetRow = i + 2; // 実際の行番号
+        break;
+      }
+    }
+    
+    if (!targetRow) {
+      return { success: false, error: 'Channel not found' };
+    }
+    
+    // フラグを更新
+    if (flagType === 'liveMonitor') {
+      // A列（ライブ配信監視フラグ）
+      sheet.getRange(targetRow, 1).setValue(value);
+      Logger.log(`ライブ配信監視フラグを更新: ${channelId} = ${value}`);
+    } else if (flagType === 'excludeFlag') {
+      // B列（除外フラグ）
+      sheet.getRange(targetRow, 2).setValue(value);
+      // 行の表示/非表示を更新
+      if (value === true) {
+        sheet.hideRows(targetRow);
+      } else {
+        sheet.showRows(targetRow);
+      }
+      Logger.log(`除外フラグを更新: ${channelId} = ${value}`);
+    } else {
+      return { success: false, error: 'Invalid flagType' };
+    }
+    
+    return { success: true, channelId: channelId, flagType: flagType, value: value };
+    
+  } catch (error) {
+    Logger.log(`updateChannelFlagApi error: ${error.message}`);
+    Logger.log(error.stack);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * チャンネルのフラグを更新（クライアントサイド用）
+ * @param {Object} params パラメータ
+ * @return {Object} 更新結果
+ */
+function updateChannelFlagForClient(params) {
+  Logger.log('updateChannelFlagForClient called');
+  try {
+    const result = updateChannelFlagApi(params);
+    Logger.log('updateChannelFlagForClient success');
+    return result;
+  } catch (error) {
+    Logger.log('updateChannelFlagForClient error: ' + error.message);
+    Logger.log('Stack: ' + error.stack);
+    return { success: false, error: error.message };
   }
 }
 
