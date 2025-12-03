@@ -28,6 +28,7 @@ const CONFIG = {
   MIN_SUBSCRIBER_COUNT: 5000, // 最小登録者数
   MAX_RESULTS: 500, // 最大取得件数
   ACTIVE_DAYS_THRESHOLD: 7, // アクティブ判定: 最終投稿が何日以内か
+  UPDATE_INTERVAL_DAYS: 7, // 既存チャンネルの情報更新間隔（日数）
 
   // 除外する企業・グループ名（部分一致）
   EXCLUDED_KEYWORDS: [
