@@ -1,0 +1,30 @@
+{
+  "name": "vtuber-search-gas",
+  "version": "1.0.0",
+  "description": "VTuberチャンネル検索・収集ツール（Google Apps Script）",
+  "scripts": {
+    "login": "clasp login",
+    "create": "clasp create --type standalone --title 'VTuber検索ツール'",
+    "push": "clasp push",
+    "pull": "clasp pull",
+    "open": "clasp open",
+    "logs": "clasp logs",
+    "deploy:new": "clasp deploy --description 'VTuber Radar WebApp'",
+    "deploy": "npm run deploy:version",
+    "deploy:version": "node scripts/deploy.js",
+    "deployments": "clasp deployments",
+    "undeploy": "clasp undeploy",
+    "webapp:open": "clasp open --webapp"
+  },
+  "keywords": [
+    "google-apps-script",
+    "youtube",
+    "vtuber"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@google/clasp": "^2.4.2",
+    "@types/google-apps-script": "^1.0.83"
+  }
+}

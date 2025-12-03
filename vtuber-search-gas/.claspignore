@@ -1,0 +1,6 @@
+# clasp ignore file
+**/**
+!*.gs
+!*.js
+!*.html
+!appsscript.json

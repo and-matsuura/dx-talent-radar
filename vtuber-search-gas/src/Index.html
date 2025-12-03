@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-tertiary: #1a1a26;
+      --bg-card: #16161f;
+      --bg-card-hover: #1e1e2a;
+      --text-primary: #f0f0f5;
+      --text-secondary: #a0a0b0;
+      --text-muted: #606070;
+      --accent-primary: #ff3d71;
+      --accent-secondary: #00d9ff;
+      --accent-gradient: linear-gradient(135deg, #ff3d71 0%, #ff6b9d 100%);
+      --success: #00e676;
+      --warning: #ffab00;
+      --border-color: #2a2a38;
+      --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.5);
+      --shadow-glow: 0 0 20px rgba(255, 61, 113, 0.3);
+      --radius-sm: 6px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-full: 9999px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Outfit', 'Noto Sans JP', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* Background Effects */
+    .bg-pattern {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+      background: 
+        radial-gradient(ellipse at 20% 20%, rgba(255, 61, 113, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(0, 217, 255, 0.06) 0%, transparent 50%),
+        linear-gradient(180deg, var(--bg-primary) 0%, #0d0d14 100%);
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Header */
+    header {
+      padding: 24px 0;
+      border-bottom: 1px solid var(--border-color);
+      background: rgba(10, 10, 15, 0.9);
+      backdrop-filter: blur(20px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #007BBB 0%, #00a8e8 100%);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 0 20px rgba(0, 123, 187, 0.4);
+    }
+
+    .logo-text {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .logo-text span {
+      background: linear-gradient(135deg, #007BBB 0%, #00a8e8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .search-box {
+      flex: 1;
+      max-width: 400px;
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 12px 20px 12px 48px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-full);
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: inherit;
+      transition: all 0.3s ease;
+    }
+
+    .search-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px rgba(255, 61, 113, 0.15);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 16px;
+    }
+
+    /* Stats Section */
+    .stats-section {
+      padding: 32px 0;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+      border-color: var(--accent-primary);
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      background: var(--bg-tertiary);
+      padding: 4px;
+      border-radius: var(--radius-full);
+    }
+
+    .tab-btn {
+      padding: 10px 20px;
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-full);
+      color: var(--text-secondary);
+      font-size: 14px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .tab-btn.active {
+      background: var(--accent-gradient);
+      color: white;
+      box-shadow: var(--shadow-glow);
+    }
+
+    .tab-btn:hover:not(.active) {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .sort-select {
+      padding: 10px 16px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .sort-select:hover {
+      border-color: var(--accent-primary);
+    }
+
+    /* Channel List */
+    .channel-list {
+      display: block;
+      width: 100%;
+    }
+
+    .channel-card {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      overflow: hidden;
+    }
+    
+    .channel-card-main {
+      display: table;
+      width: 100%;
+      padding: 10px 16px;
+      min-height: 68px;
+    }
+
+    .channel-card:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(255, 61, 113, 0.3);
+    }
+    
+    .channel-card.expanded {
+      border-color: rgba(255, 61, 113, 0.5);
+    }
+
+    .channel-card-main > * {
+      display: table-cell;
+      vertical-align: middle;
+      padding: 4px 8px;
+    }
+
+    .rank {
+      width: 36px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .rank.top-3 {
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-size: 18px;
+    }
+
+    /* アバターセルの固定サイズ（正方形） */
+    .channel-card-main > img.channel-avatar {
+      width: 48px;
+      height: 48px;
+      padding: 0;
+    }
+
+    .channel-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      object-fit: cover;
+      object-position: center;
+      border: 2px solid var(--border-color);
+      vertical-align: middle;
+      background: var(--bg-tertiary);
+    }
+
+    .channel-card:hover .channel-avatar {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 10px rgba(255, 61, 113, 0.3);
+    }
+
+    .channel-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px;
+    }
+
+    .channel-stat {
+      width: 90px;
+      text-align: center;
+    }
+
+    .stat-num {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .stat-label-sm {
+      display: block;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    
+    .stat-date {
+      display: block;
+      font-size: 9px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      opacity: 0.8;
+    }
+
+    .live-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      background: rgba(255, 61, 113, 0.15);
+      border: 1px solid var(--accent-primary);
+      border-radius: var(--radius-full);
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--accent-primary);
+    }
+    
+    /* Channel Detail Section */
+    .channel-detail {
+      display: none;
+      padding: 16px;
+      margin-top: 8px;
+      background: var(--bg-tertiary);
+      border-top: 1px solid var(--border-color);
+      border-radius: 0 0 var(--radius-md) var(--radius-md);
+    }
+    
+    .channel-card.expanded .channel-detail {
+      display: block;
+    }
+    
+    .channel-detail-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    
+    .detail-item {
+      margin-bottom: 8px;
+    }
+    
+    .detail-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .detail-value {
+      font-size: 14px;
+      color: var(--text-primary);
+      word-break: break-word;
+    }
+    
+    .detail-description {
+      grid-column: 1 / -1;
+      margin-top: 8px;
+    }
+    
+    .detail-description .detail-value {
+      font-size: 13px;
+      line-height: 1.6;
+      max-height: 120px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    
+    .detail-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-color);
+    }
+    
+    .detail-btn {
+      padding: 8px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      display: inline-block;
+    }
+    
+    .detail-btn:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-primary);
+      color: var(--accent-primary);
+    }
+    
+    .detail-btn.primary {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
+      color: white;
+    }
+    
+    .detail-btn.primary:hover {
+      background: #ff2d5f;
+      border-color: #ff2d5f;
+    }
+    
+    @media (max-width: 768px) {
+      .channel-detail-content {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Live Streams Section */
+    .live-section {
+      margin-top: 40px;
+      padding: 32px 0;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 24px;
+    }
+
+    .section-title .icon {
+      width: 32px;
+      height: 32px;
+      background: rgba(255, 61, 113, 0.2);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent-primary);
+    }
+
+    .live-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .live-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      transition: all 0.3s ease;
+    }
+
+    .live-card:hover {
+      border-color: var(--accent-primary);
+      box-shadow: var(--shadow-glow);
+    }
+
+    .live-card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .live-card-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .live-card-channel {
+      font-weight: 600;
+      flex: 1;
+    }
+
+    .live-card-viewers {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent-primary);
+      font-weight: 600;
+    }
+
+    .live-card-title {
+      font-size: 14px;
+      color: var(--text-secondary);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* Pagination */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 32px;
+      padding: 24px 0;
+    }
+
+    .page-btn {
+      padding: 10px 16px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      color: var(--text-secondary);
+      font-size: 14px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .page-btn:hover:not(:disabled) {
+      border-color: var(--accent-primary);
+      color: var(--accent-primary);
+    }
+
+    .page-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .page-btn.active {
+      background: var(--accent-gradient);
+      border-color: transparent;
+      color: white;
+    }
+
+    .page-info {
+      color: var(--text-muted);
+      font-size: 14px;
+      padding: 0 16px;
+    }
+
+    /* Loading */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 60px;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid var(--border-color);
+      border-top-color: var(--accent-primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    /* Footer */
+    footer {
+      padding: 32px 0;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+      border-top: 1px solid var(--border-color);
+      margin-top: 40px;
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .channel-stat:last-child {
+        display: none;
+      }
+      
+      .channel-stat {
+        width: 70px;
+      }
+      
+      .channel-name {
+        max-width: 150px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .header-content {
+        flex-wrap: wrap;
+      }
+      
+      .search-box {
+        order: 3;
+        max-width: 100%;
+        width: 100%;
+        margin-top: 12px;
+      }
+      
+      .channel-card-main {
+        padding: 8px 10px;
+        min-height: 56px;
+      }
+      
+      .channel-avatar,
+      .channel-card-main > img.channel-avatar {
+        width: 40px;
+        height: 40px;
+      }
+      
+      .channel-stat:nth-child(n+5) {
+        display: none;
+      }
+      
+      .channel-name {
+        max-width: 120px;
+        font-size: 13px;
+      }
+      
+      .channel-name::after {
+        content: ' (' attr(data-subs) ')';
+        font-size: 11px;
+        color: var(--accent-primary);
+        font-weight: 400;
+      }
+      
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      .stat-card {
+        padding: 16px;
+      }
+      
+      .stat-value {
+        font-size: 24px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .channel-stat {
+        display: none;
+      }
+      
+      .channel-name {
+        max-width: 180px;
+      }
+      
+      .channel-avatar,
+      .channel-card > img.channel-avatar {
+        width: 36px;
+        height: 36px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-pattern"></div>
+  
+  <header>
+    <div class="container header-content">
+      <div class="logo">
+        <div class="logo-icon">📡</div>
+        <div class="logo-text">VTuber <span>Radar</span></div>
+      </div>
+      
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="search-input" id="searchInput" placeholder="チャンネルを検索...">
+      </div>
+    </div>
+  </header>
+  
+  <main class="container">
+    <!-- Stats Section -->
+    <section class="stats-section">
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+          <div class="stat-label">Total Channels</div>
+          <div class="stat-value" id="statTotalChannels">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Subscribers</div>
+          <div class="stat-value" id="statTotalSubs">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Avg Subscribers</div>
+          <div class="stat-value" id="statAvgSubs">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Live Monitoring</div>
+          <div class="stat-value" id="statLiveMonitor">-</div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Controls -->
+    <div class="controls">
+      <div class="tabs">
+        <button class="tab-btn active" data-sort="maxViewerCount">最大同接</button>
+        <button class="tab-btn" data-sort="subscriberCount">登録者数</button>
+        <button class="tab-btn" data-sort="avgViewCount">平均再生</button>
+        <button class="tab-btn" data-sort="uploadFrequency">投稿頻度</button>
+      </div>
+    </div>
+    
+    <!-- Channel List -->
+    <div class="channel-list" id="channelList">
+      <div class="loading">
+        <div class="spinner"></div>
+      </div>
+    </div>
+    
+    <!-- Pagination -->
+    <div class="pagination" id="pagination"></div>
+    
+    <!-- Live Streams Section -->
+    <section class="live-section" id="liveSection" style="display: none;">
+      <h2 class="section-title">
+        <span class="icon">🔴</span>
+        最近のライブ配信
+      </h2>
+      <div class="live-grid" id="liveGrid"></div>
+    </section>
+  </main>
+  
+  <footer>
+    <div class="container">
+      VTuber Radar © 2024 - Powered by Google Apps Script
+    </div>
+  </footer>
+  
+  <script>
+    // State
+    let currentPage = 1;
+    let currentSort = 'maxViewerCount';
+    let currentSearch = '';
+    let totalPages = 1;
+    let expandAllOnSearch = false;
+    
+    // Format number with K/M suffix
+    function formatNumber(num) {
+      if (num >= 1000000) {
+        return (num / 1000000).toFixed(1) + 'M';
+      }
+      if (num >= 1000) {
+        return (num / 1000).toFixed(1) + 'K';
+      }
+      return num.toLocaleString();
+    }
+    
+    // Format date string
+    function formatDate(dateString) {
+      if (!dateString || dateString === 'N/A' || dateString === '') {
+        return '';
+      }
+      try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) {
+          return dateString;
+        }
+        // Format: YYYY-MM-DD HH:mm
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day} ${hours}:${minutes}`;
+      } catch (e) {
+        return dateString;
+      }
+    }
+    
+    // Promisified wrapper for google.script.run
+    function runServerFunction(functionName, ...args) {
+      return new Promise((resolve, reject) => {
+        console.log('Calling server function:', functionName, args);
+        google.script.run
+          .withSuccessHandler((result) => {
+            console.log('Server function success:', functionName, result);
+            resolve(result);
+          })
+          .withFailureHandler((error) => {
+            console.error('Server function failed:', functionName, error);
+            reject(error);
+          })
+          [functionName](...args);
+      });
+    }
+    
+    // Test server connection
+    async function testServerConnection() {
+      try {
+        const result = await runServerFunction('testConnection');
+        console.log('Test connection result:', result);
+        alert('サーバー接続OK: ' + JSON.stringify(result));
+      } catch (error) {
+        console.error('Test connection failed:', error);
+        alert('サーバー接続エラー: ' + error);
+      }
+    }
+    
+    // Load stats
+    async function loadStats() {
+      try {
+        const data = await runServerFunction('getStatsForClient');
+        if (!data) {
+          console.error('Stats data is null');
+          return;
+        }
+        document.getElementById('statTotalChannels').textContent = formatNumber(data.totalChannels || 0);
+        document.getElementById('statTotalSubs').textContent = formatNumber(data.totalSubscribers || 0);
+        document.getElementById('statAvgSubs').textContent = formatNumber(data.avgSubscribers || 0);
+        document.getElementById('statLiveMonitor').textContent = formatNumber(data.liveMonitorCount || 0);
+      } catch (error) {
+        console.error('Failed to load stats:', error);
+      }
+    }
+    
+    // Load channels
+    async function loadChannels() {
+      const listEl = document.getElementById('channelList');
+      listEl.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+      
+      try {
+        const params = {
+          page: currentPage,
+          limit: 50,
+          sortBy: currentSort,
+          sortOrder: 'desc',
+          search: currentSearch
+        };
+        
+        const data = await runServerFunction('getChannelsForClient', params);
+        
+        // Null check
+        if (!data) {
+          console.error('Channel data is null');
+          listEl.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">⚠️</div>
+              <p>データの取得に失敗しました</p>
+            </div>
+          `;
+          return;
+        }
+        
+        totalPages = data.totalPages || 0;
+        
+        if (!data.channels || data.channels.length === 0) {
+          listEl.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">📭</div>
+              <p>チャンネルが見つかりませんでした</p>
+            </div>
+          `;
+          return;
+        }
+        
+        const expandedClass = expandAllOnSearch ? ' expanded' : '';
+        
+        listEl.innerHTML = data.channels.map(ch => {
+          const url = escapeHtml(ch.channelUrl || '');
+          const thumb = ch.thumbnailUrl || 'https://via.placeholder.com/48';
+          const name = escapeHtml(ch.channelName || '');
+          const rankClass = ch.rank <= 3 ? 'top-3' : '';
+          const badge = ch.liveMonitor ? '<span class="live-badge">監視中</span>' : '';
+          
+          // 最大同時接続数日時の表示
+          const maxViewerCountDateHtml = ch.maxViewerCountDate && ch.maxViewerCountDate !== '' 
+            ? '<span class="stat-date">' + escapeHtml(formatDate(ch.maxViewerCountDate)) + '</span>' 
+            : '';
+          
+          // Twitterリンクの表示
+          const twitterLinkHtml = ch.twitterLink && ch.twitterLink !== 'N/A' 
+            ? '<a href="' + escapeHtml(ch.twitterLink) + '" target="_blank" class="detail-btn" onclick="event.stopPropagation()">X（Twitter）</a>' 
+            : '';
+          
+          // 説明文の表示（500文字まで）
+          const description = ch.description ? (ch.description.length > 500 ? ch.description.substring(0, 500) + '...' : ch.description) : '説明文がありません';
+          
+          return '<div class="channel-card' + expandedClass + '" data-url="' + url + '" data-channel-id="' + escapeHtml(ch.channelId) + '">' +
+            '<div class="channel-card-main">' +
+            '<span class="rank ' + rankClass + '">' + ch.rank + '</span>' +
+            '<img class="channel-avatar" src="' + thumb + '" alt="" onerror="this.style.display=\'none\'">' +
+            '<span class="channel-name" data-subs="' + formatNumber(ch.subscriberCount) + '">' + name + '</span>' +
+            '<span class="channel-stat"><span class="stat-num">' + formatNumber(ch.subscriberCount) + '</span><span class="stat-label-sm">登録者</span></span>' +
+            '<span class="channel-stat"><span class="stat-num">' + formatNumber(ch.avgViewCount) + '</span><span class="stat-label-sm">平均再生</span></span>' +
+            '<span class="channel-stat"><span class="stat-num">' + formatNumber(ch.maxViewerCount) + '</span><span class="stat-label-sm">最大同接</span>' + maxViewerCountDateHtml + '</span>' +
+            '<span class="channel-stat"><span class="stat-num">' + (ch.uploadFrequency ? ch.uploadFrequency.toFixed(1) : '0.0') + '</span><span class="stat-label-sm">投稿頻度（本/月）</span></span>' +
+            '<span class="channel-stat">' + badge + '</span>' +
+            '</div>' +
+            '<div class="channel-detail">' +
+            '<div class="channel-detail-content">' +
+            '<div class="detail-item"><div class="detail-label">チャンネルID</div><div class="detail-value">' + escapeHtml(ch.channelId) + '</div></div>' +
+            '<div class="detail-item"><div class="detail-label">登録者数</div><div class="detail-value">' + formatNumber(ch.subscriberCount) + '人</div></div>' +
+            '<div class="detail-item"><div class="detail-label">平均再生回数</div><div class="detail-value">' + formatNumber(ch.avgViewCount) + '回</div></div>' +
+            '<div class="detail-item"><div class="detail-label">平均いいね数</div><div class="detail-value">' + formatNumber(ch.avgLikeCount) + '</div></div>' +
+            '<div class="detail-item"><div class="detail-label">平均コメント数</div><div class="detail-value">' + formatNumber(ch.avgCommentCount) + '</div></div>' +
+            '<div class="detail-item"><div class="detail-label">投稿頻度</div><div class="detail-value">' + (ch.uploadFrequency ? ch.uploadFrequency.toFixed(1) : '0.0') + '本/月</div></div>' +
+            '<div class="detail-item"><div class="detail-label">最大同時接続数</div><div class="detail-value">' + formatNumber(ch.maxViewerCount) + '人' + (ch.maxViewerCountDate && ch.maxViewerCountDate !== '' ? ' (' + escapeHtml(formatDate(ch.maxViewerCountDate)) + ')' : '') + '</div></div>' +
+            '<div class="detail-item"><div class="detail-label">最終投稿日</div><div class="detail-value">' + (ch.lastPublishedAt ? escapeHtml(formatDate(ch.lastPublishedAt)) : 'N/A') + '</div></div>' +
+            '<div class="detail-item detail-description"><div class="detail-label">チャンネル説明文</div><div class="detail-value">' + escapeHtmlWithBreaks(description) + '</div></div>' +
+            '</div>' +
+            '<div class="detail-actions">' +
+            '<a href="' + url + '" target="_blank" class="detail-btn primary" onclick="event.stopPropagation()">YouTubeで開く</a>' +
+            twitterLinkHtml +
+            '</div>' +
+            '</div>' +
+            '</div>';
+        }).join('');
+        
+        // Add click handlers
+        document.querySelectorAll('.channel-card').forEach(card => {
+          card.addEventListener('click', (e) => {
+            // ボタンクリック時は詳細説明の開閉をしない
+            if (e.target.closest('.detail-btn')) {
+              return;
+            }
+            card.classList.toggle('expanded');
+          });
+        });
+        
+        // 検索時はすべて展開した状態にする
+        if (expandAllOnSearch) {
+          expandAllOnSearch = false; // 次回の検索までリセット
+        }
+        
+        renderPagination();
+        
+      } catch (error) {
+        console.error('Failed to load channels:', error);
+        listEl.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">⚠️</div>
+            <p>データの読み込みに失敗しました</p>
+          </div>
+        `;
+      }
+    }
+    
+    // Load live streams
+    async function loadLiveStreams() {
+      try {
+        const data = await runServerFunction('getLiveStreamsForClient');
+        
+        if (data && data.liveStreams && data.liveStreams.length > 0) {
+          const sectionEl = document.getElementById('liveSection');
+          const gridEl = document.getElementById('liveGrid');
+          
+          sectionEl.style.display = 'block';
+          
+          gridEl.innerHTML = data.liveStreams.map(stream => `
+            <div class="live-card" onclick="window.open('${stream.url}', '_blank')">
+              <div class="live-card-header">
+                <div class="live-card-channel">${escapeHtml(stream.channelName)}</div>
+                <div class="live-card-viewers">
+                  <span>👁</span>
+                  ${formatNumber(stream.viewerCount)}
+                </div>
+              </div>
+              <div class="live-card-title">${escapeHtml(stream.title)}</div>
+            </div>
+          `).join('');
+        }
+      } catch (error) {
+        console.error('Failed to load live streams:', error);
+      }
+    }
+    
+    // Render pagination
+    function renderPagination() {
+      const paginationEl = document.getElementById('pagination');
+      
+      if (totalPages <= 1) {
+        paginationEl.innerHTML = '';
+        return;
+      }
+      
+      let html = `
+        <button class="page-btn" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>← 前へ</button>
+      `;
+      
+      // Show page numbers
+      const pages = [];
+      for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+          pages.push(i);
+        } else if (pages[pages.length - 1] !== '...') {
+          pages.push('...');
+        }
+      }
+      
+      pages.forEach(page => {
+        if (page === '...') {
+          html += `<span class="page-info">...</span>`;
+        } else {
+          html += `<button class="page-btn ${page === currentPage ? 'active' : ''}" onclick="goToPage(${page})">${page}</button>`;
+        }
+      });
+      
+      html += `
+        <button class="page-btn" onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>次へ →</button>
+      `;
+      
+      paginationEl.innerHTML = html;
+    }
+    
+    // Go to page
+    function goToPage(page) {
+      if (page < 1 || page > totalPages) return;
+      currentPage = page;
+      loadChannels();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    // Escape HTML
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    // Escape HTML and preserve line breaks
+    function escapeHtmlWithBreaks(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      // 改行文字を<br>タグに変換
+      return div.innerHTML.replace(/\n/g, '<br>');
+    }
+    
+    // Event listeners
+    document.addEventListener('DOMContentLoaded', () => {
+      // Load initial data
+      loadStats();
+      loadChannels();
+      loadLiveStreams();
+      
+      // Tab buttons
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentSort = btn.dataset.sort;
+          currentPage = 1;
+          loadChannels();
+        });
+      });
+      
+      // Search input
+      let searchTimeout;
+      document.getElementById('searchInput').addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          const newSearch = e.target.value;
+          // 検索が開始された場合（空でない値が入力された場合）はすべて展開
+          if (newSearch && newSearch.trim() !== '') {
+            expandAllOnSearch = true;
+          }
+          currentSearch = newSearch;
+          currentPage = 1;
+          loadChannels();
+        }, 300);
+      });
+    });
+  </script>
+</body>
+</html>
+

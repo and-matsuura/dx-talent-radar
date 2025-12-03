@@ -1,0 +1,17 @@
+# Node modules
+node_modules/
+
+# clasp credentials
+.clasprc.json
+
+# clasp generated files
+.clasp.json.lock
+
+# Deployment configuration (contains deployment ID)
+deploy.config.json
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
