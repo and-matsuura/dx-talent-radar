@@ -70,10 +70,10 @@ class YouTubeSearcher {
 
     Array.from(allChannelIds).forEach(id => {
       if (existingChannels.has(id)) {
-        // 既存チャンネル：1日以上経過していたら更新対象
+        // 既存チャンネル：指定日数以上経過していたら更新対象
         const channelInfo = existingChannels.get(id);
         const daysSinceLastFetch = (new Date() - channelInfo.fetchedAt) / (1000 * 60 * 60 * 24);
-        if (daysSinceLastFetch >= 1) {
+        if (daysSinceLastFetch >= CONFIG.UPDATE_INTERVAL_DAYS) {
           updateChannelIds.push({id: id, row: channelInfo.row});
         }
       } else {
@@ -206,12 +206,13 @@ class YouTubeSearcher {
   }
 
   /**
-   * チャンネル詳細情報を取得
+   * チャンネル詳細情報を取得（最適化版）
+   * Phase 1: 基本情報でフィルタリング（API呼び出し: channels.listのみ）
+   * Phase 2: 合格チャンネルのみ動画情報を取得（API呼び出し: playlistItems.list, videos.list）
    * @param {Array} channelIds チャンネルID一覧
    * @return {Array} チャンネル詳細情報の配列
    */
   getChannelDetails(channelIds) {
-    const channels = [];
     const batchSize = 50; // APIの上限
 
     // フィルタリング統計
@@ -226,6 +227,12 @@ class YouTubeSearcher {
       passed: 0
     };
 
+    // ========================================
+    // Phase 1: 基本情報でフィルタリング
+    // ========================================
+    Logger.log('--- Phase 1: 基本情報フィルタリング ---');
+    const filteredChannels = []; // フィルタを通過したチャンネル情報
+
     for (let i = 0; i < channelIds.length; i += batchSize) {
       if (this.isTimeoutApproaching()) {
         Logger.log('実行時間制限が近づいています。詳細取得を中断します。');
@@ -233,7 +240,7 @@ class YouTubeSearcher {
       }
 
       const batch = channelIds.slice(i, i + batchSize);
-      Logger.log(`チャンネル詳細取得中... (${i + 1}〜${i + batch.length}/${channelIds.length})`);
+      Logger.log(`チャンネル基本情報取得中... (${i + 1}〜${i + batch.length}/${channelIds.length})`);
 
       try {
         // YouTube Data API: channels.list
@@ -245,12 +252,12 @@ class YouTubeSearcher {
         if (response.items) {
           response.items.forEach(channel => {
             try {
-              const result = this.processChannel(channel, filterStats);
+              const result = this.filterChannelByBasicInfo(channel, filterStats);
               if (result) {
-                channels.push(result);
+                filteredChannels.push(result);
               }
             } catch (error) {
-              Logger.log(`チャンネル処理エラー (${channel.id}): ${error.message}`);
+              Logger.log(`チャンネルフィルタリングエラー (${channel.id}): ${error.message}`);
             }
           });
         }
@@ -263,37 +270,69 @@ class YouTubeSearcher {
       }
     }
 
+    Logger.log(`Phase 1完了: ${filteredChannels.length}件がフィルタ通過（${channelIds.length}件中）`);
+
+    // ========================================
+    // Phase 2: 動画情報を取得してアクティブ判定
+    // ========================================
+    Logger.log('--- Phase 2: 動画情報取得 ---');
+    const channels = [];
+
+    for (let i = 0; i < filteredChannels.length; i++) {
+      if (this.isTimeoutApproaching()) {
+        Logger.log('実行時間制限が近づいています。動画情報取得を中断します。');
+        break;
+      }
+
+      const channelInfo = filteredChannels[i];
+
+      try {
+        const result = this.enrichChannelWithVideoData(channelInfo, filterStats);
+        if (result) {
+          channels.push(result);
+        }
+      } catch (error) {
+        Logger.log(`動画情報取得エラー (${channelInfo.channelId}): ${error.message}`);
+      }
+
+      // 10件ごとにログ出力
+      if ((i + 1) % 10 === 0) {
+        Logger.log(`動画情報取得中... (${i + 1}/${filteredChannels.length})`);
+      }
+    }
+
     // フィルタリング統計をログ出力
     Logger.log('--- フィルタリング統計 ---');
     Logger.log(`処理総数: ${filterStats.total}`);
-    Logger.log(`除外理由:`);
+    Logger.log(`Phase 1除外:`);
     Logger.log(`  登録者数不足 (<${CONFIG.MIN_SUBSCRIBER_COUNT}人): ${filterStats.subscriberCount}`);
     Logger.log(`  除外キーワード該当: ${filterStats.excluded}`);
     Logger.log(`  プレイリスト情報なし: ${filterStats.noPlaylist}`);
     Logger.log(`  不正なプレイリストID: ${filterStats.invalidPlaylist}`);
+    Logger.log(`Phase 2除外:`);
     Logger.log(`  動画なし: ${filterStats.noVideos}`);
     Logger.log(`  非アクティブ (>${CONFIG.ACTIVE_DAYS_THRESHOLD}日): ${filterStats.inactive}`);
-    Logger.log(`合格: ${filterStats.passed}`);
+    Logger.log(`最終合格: ${filterStats.passed}`);
 
     return channels;
   }
 
   /**
-   * チャンネル情報を処理・フィルタリング
+   * 基本情報でチャンネルをフィルタリング（API呼び出しなし）
    * @param {Object} channel YouTube APIのチャンネルオブジェクト
-   * @param {Object} filterStats フィルタリング統計（オプション）
-   * @return {Object|null} 処理済みチャンネル情報、または除外される場合はnull
+   * @param {Object} filterStats フィルタリング統計
+   * @return {Object|null} フィルタ通過したチャンネル情報、または除外される場合はnull
    */
-  processChannel(channel, filterStats = null) {
+  filterChannelByBasicInfo(channel, filterStats) {
     const snippet = channel.snippet;
     const statistics = channel.statistics;
 
-    if (filterStats) filterStats.total++;
+    filterStats.total++;
 
     // 登録者数チェック
     const subscriberCount = parseInt(statistics.subscriberCount) || 0;
     if (subscriberCount < CONFIG.MIN_SUBSCRIBER_COUNT) {
-      if (filterStats) filterStats.subscriberCount++;
+      filterStats.subscriberCount++;
       return null;
     }
 
@@ -301,27 +340,55 @@ class YouTubeSearcher {
     const channelName = snippet.title || '';
     const description = snippet.description || '';
     if (this.shouldExclude(channelName, description)) {
-      if (filterStats) filterStats.excluded++;
+      filterStats.excluded++;
       return null;
     }
 
     // アップロード動画IDを取得
     const uploadsPlaylistId = channel.contentDetails?.relatedPlaylists?.uploads;
     if (!uploadsPlaylistId) {
-      if (filterStats) filterStats.noPlaylist++;
+      filterStats.noPlaylist++;
       return null;
     }
 
     // プレイリストIDの形式を検証（UUで始まる24文字）
     if (!uploadsPlaylistId.startsWith('UU') || uploadsPlaylistId.length !== 24) {
-      if (filterStats) filterStats.invalidPlaylist++;
+      filterStats.invalidPlaylist++;
       return null;
     }
 
-    // 最近の動画を取得
-    const recentVideos = this.getRecentVideos(uploadsPlaylistId);
+    // チャンネルアイコンのURLを取得（高解像度を優先）
+    const thumbnailUrl = snippet.thumbnails?.high?.url ||
+                         snippet.thumbnails?.medium?.url ||
+                         snippet.thumbnails?.default?.url || '';
+
+    // X（Twitter）リンクを抽出
+    const twitterLink = this.extractTwitterLink(description);
+
+    // フィルタ通過：基本情報を返す
+    return {
+      channelId: channel.id,
+      channelName: channelName,
+      channelUrl: `https://www.youtube.com/channel/${channel.id}`,
+      subscriberCount: subscriberCount,
+      description: description.substring(0, 500),
+      thumbnailUrl: thumbnailUrl,
+      twitterLink: twitterLink,
+      uploadsPlaylistId: uploadsPlaylistId
+    };
+  }
+
+  /**
+   * チャンネルに動画情報を付加（API呼び出しあり）
+   * @param {Object} channelInfo 基本情報を持つチャンネルオブジェクト
+   * @param {Object} filterStats フィルタリング統計
+   * @return {Object|null} 完全なチャンネル情報、または除外される場合はnull
+   */
+  enrichChannelWithVideoData(channelInfo, filterStats) {
+    // 最近の動画を取得（API呼び出し）
+    const recentVideos = this.getRecentVideos(channelInfo.uploadsPlaylistId);
     if (recentVideos.length === 0) {
-      if (filterStats) filterStats.noVideos++;
+      filterStats.noVideos++;
       return null;
     }
 
@@ -329,43 +396,66 @@ class YouTubeSearcher {
     const lastPublishedAt = new Date(recentVideos[0].publishedAt);
     const daysSinceLastPost = (new Date() - lastPublishedAt) / (1000 * 60 * 60 * 24);
     if (daysSinceLastPost > CONFIG.ACTIVE_DAYS_THRESHOLD) {
-      if (filterStats) filterStats.inactive++;
+      filterStats.inactive++;
       return null;
     }
 
-    // 動画の詳細情報を取得
+    // 動画の詳細情報を取得（API呼び出し）
     const videoDetails = this.getVideoDetails(recentVideos.map(v => v.videoId));
 
     // 統計情報を計算
     const stats = this.calculateStatistics(recentVideos, videoDetails);
 
-    // X（Twitter）リンクを抽出
-    const twitterLink = this.extractTwitterLink(description);
-
-    // チャンネルアイコンのURLを取得（高解像度を優先）
-    const thumbnailUrl = snippet.thumbnails?.high?.url ||
-                         snippet.thumbnails?.medium?.url ||
-                         snippet.thumbnails?.default?.url || '';
-
     // フィルタ合格
-    if (filterStats) filterStats.passed++;
+    filterStats.passed++;
 
-    // チャンネルデータを構築
+    // 完全なチャンネルデータを構築
     return {
-      thumbnailUrl: thumbnailUrl,
-      channelId: channel.id,
-      channelName: channelName,
-      channelUrl: `https://www.youtube.com/channel/${channel.id}`,
-      subscriberCount: subscriberCount,
+      thumbnailUrl: channelInfo.thumbnailUrl,
+      channelId: channelInfo.channelId,
+      channelName: channelInfo.channelName,
+      channelUrl: channelInfo.channelUrl,
+      subscriberCount: channelInfo.subscriberCount,
       uploadFrequency: stats.uploadFrequency,
       avgViewCount: stats.avgViewCount,
       avgLikeCount: stats.avgLikeCount,
       avgCommentCount: stats.avgCommentCount,
       lastPublishedAt: Utilities.formatDate(lastPublishedAt, 'JST', 'yyyy-MM-dd HH:mm:ss'),
-      description: description.substring(0, 500), // 長すぎる説明文を切り詰め
-      twitterLink: twitterLink,
+      description: channelInfo.description,
+      twitterLink: channelInfo.twitterLink,
       fetchedAt: new Date()
     };
+  }
+
+  /**
+   * チャンネル情報を処理・フィルタリング（更新処理用）
+   * 新しいメソッドを内部で使用し、一貫性を保つ
+   * @param {Object} channel YouTube APIのチャンネルオブジェクト
+   * @param {Object} filterStats フィルタリング統計（オプション）
+   * @return {Object|null} 処理済みチャンネル情報、または除外される場合はnull
+   */
+  processChannel(channel, filterStats = null) {
+    // ダミーの統計オブジェクトを用意（filterStatsがnullの場合）
+    const stats = filterStats || {
+      total: 0,
+      subscriberCount: 0,
+      excluded: 0,
+      noPlaylist: 0,
+      invalidPlaylist: 0,
+      noVideos: 0,
+      inactive: 0,
+      passed: 0
+    };
+
+    // Phase 1: 基本情報でフィルタリング
+    const basicInfo = this.filterChannelByBasicInfo(channel, stats);
+    if (!basicInfo) {
+      return null;
+    }
+
+    // Phase 2: 動画情報を付加
+    const result = this.enrichChannelWithVideoData(basicInfo, stats);
+    return result;
   }
 
   /**
