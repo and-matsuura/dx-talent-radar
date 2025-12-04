@@ -14,6 +14,7 @@ function searchAndSaveVTuberChannels() {
   Logger.log('=== VTuberチャンネル検索開始 ===');
 
   const errorLogger = new ErrorLogger();
+  const quotaTracker = new APIQuotaTracker('searchAndSaveVTuberChannels');
 
   try {
     // スプレッドシートマネージャーを初期化
@@ -24,8 +25,8 @@ function searchAndSaveVTuberChannels() {
     const existingChannels = sheetManager.getExistingChannelIds();
     Logger.log(`既存チャンネル数: ${existingChannels.size}`);
 
-    // YouTube検索を実行（SpreadsheetManagerを渡して除外キーワードを読み込む）
-    const searcher = new YouTubeSearcher(sheetManager);
+    // YouTube検索を実行（SpreadsheetManagerとquotaTrackerを渡す）
+    const searcher = new YouTubeSearcher(sheetManager, quotaTracker);
     const result = searcher.searchVTuberChannels(existingChannels);
 
     Logger.log(`新規チャンネル発見数: ${result.newChannels.length}`);
@@ -58,6 +59,9 @@ function searchAndSaveVTuberChannels() {
       Logger.log('警告: 実行時間が5分を超えています。GASの6分制限に注意してください。');
     }
 
+    // API使用量をログに記録（正常終了）
+    quotaTracker.logToSheet('正常終了');
+
   } catch (error) {
     Logger.log(`エラーが発生しました: ${error.message}`);
     Logger.log(error.stack);
@@ -65,6 +69,8 @@ function searchAndSaveVTuberChannels() {
       functionName: 'searchAndSaveVTuberChannels',
       apiName: 'メイン処理'
     });
+    // API使用量をログに記録（異常終了）
+    quotaTracker.logToSheet('異常終了', error.message);
     throw error;
   }
 }
@@ -165,15 +171,19 @@ function monitorLiveStreams() {
   Logger.log('=== ライブ配信監視実行開始 ===');
 
   const errorLogger = new ErrorLogger();
+  const quotaTracker = new APIQuotaTracker('monitorLiveStreams');
 
   try {
-    const monitor = new LiveStreamMonitor();
+    const monitor = new LiveStreamMonitor(quotaTracker);
     monitor.monitorLiveStreams();
 
     const endTime = new Date().getTime();
     const executionTime = (endTime - startTime) / 1000;
     Logger.log(`実行時間: ${executionTime}秒`);
     Logger.log('=== ライブ配信監視実行完了 ===');
+
+    // API使用量をログに記録（正常終了）
+    quotaTracker.logToSheet('正常終了');
 
   } catch (error) {
     Logger.log(`エラーが発生しました: ${error.message}`);
@@ -182,6 +192,8 @@ function monitorLiveStreams() {
       functionName: 'monitorLiveStreams',
       apiName: 'メイン処理'
     });
+    // API使用量をログに記録（異常終了）
+    quotaTracker.logToSheet('異常終了', error.message);
     throw error;
   }
 }
@@ -251,12 +263,16 @@ function initializeExcludedKeywordsSheet() {
 function addChannelManually(channelIdentifier, enableLiveMonitor = false) {
   Logger.log(`=== チャンネル手動追加開始: ${channelIdentifier} ===`);
 
+  const quotaTracker = new APIQuotaTracker('addChannelManually');
+  const errorLogger = new ErrorLogger();
+
   try {
     // チャンネルIDを取得
     const channelId = getChannelIdFromIdentifier(channelIdentifier);
 
     if (!channelId) {
       Logger.log('エラー: チャンネルIDを取得できませんでした');
+      quotaTracker.logToSheet('異常終了', 'チャンネルIDを取得できませんでした');
       return;
     }
 
@@ -269,15 +285,17 @@ function addChannelManually(channelIdentifier, enableLiveMonitor = false) {
     const existingChannels = sheetManager.getExistingChannelIds();
     if (existingChannels.has(channelId)) {
       Logger.log('このチャンネルは既に登録されています');
+      quotaTracker.logToSheet('正常終了');
       return;
     }
 
     // チャンネル詳細を取得
-    const searcher = new YouTubeSearcher(sheetManager);
+    const searcher = new YouTubeSearcher(sheetManager, quotaTracker);
     const channelDetails = searcher.getChannelDetails([channelId]);
 
     if (channelDetails.length === 0) {
       Logger.log('エラー: チャンネル情報を取得できませんでした');
+      quotaTracker.logToSheet('異常終了', 'チャンネル情報を取得できませんでした');
       return;
     }
 
@@ -303,9 +321,19 @@ function addChannelManually(channelIdentifier, enableLiveMonitor = false) {
 
     Logger.log('=== チャンネル手動追加完了 ===');
 
+    // API使用量をログに記録（正常終了）
+    quotaTracker.logToSheet('正常終了');
+
   } catch (error) {
     Logger.log(`エラーが発生しました: ${error.message}`);
     Logger.log(error.stack);
+    errorLogger.logError(error, {
+      functionName: 'addChannelManually',
+      apiName: 'YouTube.Search.list / YouTube.Channels.list',
+      parameters: { channelIdentifier: channelIdentifier }
+    });
+    // API使用量をログに記録（異常終了）
+    quotaTracker.logToSheet('異常終了', error.message);
     throw error;
   }
 }
@@ -316,6 +344,8 @@ function addChannelManually(channelIdentifier, enableLiveMonitor = false) {
  * @return {string|null} チャンネルID
  */
 function getChannelIdFromIdentifier(identifier) {
+  const quotaTracker = new APIQuotaTracker('getChannelIdFromIdentifier');
+  
   try {
     // URLの場合はハンドル名またはチャンネルIDを抽出
     let channelIdentifier = identifier;
@@ -346,20 +376,27 @@ function getChannelIdFromIdentifier(identifier) {
         maxResults: 1
       });
 
+      // API使用量を記録
+      quotaTracker.recordAPICall('YouTube.Search.list');
+
       if (response.items && response.items.length > 0) {
+        quotaTracker.logToSheet('正常終了');
         return response.items[0].id.channelId;
       }
 
       Logger.log('ハンドル名からチャンネルが見つかりませんでした');
+      quotaTracker.logToSheet('正常終了');
       return null;
     }
 
     // チャンネルIDの場合はそのまま返す
     if (channelIdentifier.startsWith('UC') && channelIdentifier.length === 24) {
+      quotaTracker.logToSheet('正常終了');
       return channelIdentifier;
     }
 
     Logger.log('有効なチャンネルIDまたはハンドル名ではありません');
+    quotaTracker.logToSheet('正常終了');
     return null;
 
   } catch (error) {
@@ -370,6 +407,7 @@ function getChannelIdFromIdentifier(identifier) {
       apiName: 'YouTube.Search.list',
       parameters: { identifier: identifier }
     });
+    quotaTracker.logToSheet('異常終了', error.message);
     return null;
   }
 }

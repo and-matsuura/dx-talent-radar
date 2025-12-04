@@ -117,6 +117,27 @@ const CONFIG = {
     'チャンネル名',
     'パラメータ',
     'スタックトレース'
+  ],
+
+  // API使用量ログシート設定
+  API_USAGE_LOG_SHEET_NAME: 'API使用量ログ',
+  API_USAGE_LOG_HEADERS: [
+    '開始日時',
+    '終了日時',
+    '実行時間（秒）',
+    'ステータス',
+    '関数名',
+    'Search.list呼び出し回数',
+    'Search.listクォータ',
+    'Channels.list呼び出し回数',
+    'Channels.listクォータ',
+    'PlaylistItems.list呼び出し回数',
+    'PlaylistItems.listクォータ',
+    'Videos.list呼び出し回数',
+    'Videos.listクォータ',
+    '合計API呼び出し回数',
+    '合計クォータ使用量',
+    'エラーメッセージ'
   ]
 };
 

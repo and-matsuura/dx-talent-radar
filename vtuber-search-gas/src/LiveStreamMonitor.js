@@ -4,9 +4,10 @@
  */
 
 class LiveStreamMonitor {
-  constructor() {
+  constructor(quotaTracker = null) {
     this.sheetManager = new SpreadsheetManager();
     this.errorLogger = new ErrorLogger();
+    this.quotaTracker = quotaTracker; // API使用量追跡オブジェクト（オプション）
     this.startTime = new Date().getTime();
   }
 
@@ -113,6 +114,11 @@ class LiveStreamMonitor {
         maxResults: 1
       });
 
+      // API使用量を記録
+      if (this.quotaTracker) {
+        this.quotaTracker.recordAPICall('YouTube.Search.list');
+      }
+
       if (response.items && response.items.length > 0) {
         const liveVideo = response.items[0];
         const videoId = liveVideo.id.videoId;
@@ -158,6 +164,11 @@ class LiveStreamMonitor {
       const response = YouTube.Videos.list('liveStreamingDetails,snippet', {
         id: videoId
       });
+
+      // API使用量を記録
+      if (this.quotaTracker) {
+        this.quotaTracker.recordAPICall('YouTube.Videos.list');
+      }
 
       if (response.items && response.items.length > 0) {
         const video = response.items[0];

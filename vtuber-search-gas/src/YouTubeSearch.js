@@ -4,11 +4,12 @@
  */
 
 class YouTubeSearcher {
-  constructor(sheetManager = null) {
+  constructor(sheetManager = null, quotaTracker = null) {
     this.startTime = new Date().getTime();
     this.foundChannels = [];
     this.sheetManager = sheetManager || new SpreadsheetManager();
     this.errorLogger = new ErrorLogger();
+    this.quotaTracker = quotaTracker; // API使用量追跡オブジェクト（オプション）
 
     // 除外キーワードをスプレッドシートから取得
     this.excludedKeywords = this.sheetManager.getExcludedKeywords();
@@ -126,6 +127,11 @@ class YouTubeSearcher {
           relevanceLanguage: 'ja'
         });
 
+        // API使用量を記録
+        if (this.quotaTracker) {
+          this.quotaTracker.recordAPICall('YouTube.Search.list');
+        }
+
         if (response.items) {
           response.items.forEach(item => {
             if (item.id && item.id.channelId) {
@@ -190,6 +196,11 @@ class YouTubeSearcher {
           id: batch.join(','),
           maxResults: batchSize
         });
+
+        // API使用量を記録
+        if (this.quotaTracker) {
+          this.quotaTracker.recordAPICall('YouTube.Channels.list');
+        }
 
         if (response.items) {
           response.items.forEach(channel => {
@@ -280,6 +291,11 @@ class YouTubeSearcher {
           id: batch.join(','),
           maxResults: batchSize
         });
+
+        // API使用量を記録
+        if (this.quotaTracker) {
+          this.quotaTracker.recordAPICall('YouTube.Channels.list');
+        }
 
         if (response.items) {
           response.items.forEach(channel => {
@@ -542,6 +558,11 @@ class YouTubeSearcher {
         maxResults: CONFIG.RECENT_VIDEOS_COUNT
       });
 
+      // API使用量を記録
+      if (this.quotaTracker) {
+        this.quotaTracker.recordAPICall('YouTube.PlaylistItems.list');
+      }
+
       if (response.items && response.items.length > 0) {
         return response.items.map(item => ({
           videoId: item.snippet.resourceId.videoId,
@@ -579,6 +600,11 @@ class YouTubeSearcher {
         id: videoIds.join(','),
         maxResults: videoIds.length
       });
+
+      // API使用量を記録
+      if (this.quotaTracker) {
+        this.quotaTracker.recordAPICall('YouTube.Videos.list');
+      }
 
       if (response.items) {
         return response.items.map(item => ({
