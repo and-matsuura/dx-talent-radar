@@ -14,10 +14,6 @@ function onOpen() {
     .createMenu('VTuber Radar')
     .addItem('チャンネルをURLで追加', 'showAddChannelDialog')
     .addSeparator()
-    .addItem('スプレッドシートを初期化', 'initializeSpreadsheet')
-    .addItem('除外キーワードシートを初期化', 'initializeExcludedKeywordsSheet')
-    .addItem('属性管理シートを初期化', 'initializeAttributeSheet')
-    .addSeparator()
     .addItem('APIクォータを確認', 'checkAPIQuota')
     .addToUi();
 }
