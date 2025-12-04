@@ -6,6 +6,206 @@
  */
 
 /**
+ * スプレッドシートを開いたときにカスタムメニューを追加
+ * Container-boundスクリプト（スプレッドシートに紐づいたスクリプト）の場合に自動実行される
+ */
+function onOpen() {
+  createVTuberRadarMenu();
+}
+
+/**
+ * VTuber Radarメニューを作成
+ * Standaloneスクリプトの場合、この関数を手動で実行してメニューを追加できます
+ */
+function createVTuberRadarMenu() {
+  try {
+    // スプレッドシートを取得
+    const spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    const ui = spreadsheet.getUi();
+    
+    ui.createMenu('VTuber Radar')
+      .addItem('チャンネルをURLで追加', 'showAddChannelDialog')
+      .addSeparator()
+      .addItem('スプレッドシートを初期化', 'initializeSpreadsheet')
+      .addItem('除外キーワードシートを初期化', 'initializeExcludedKeywordsSheet')
+      .addSeparator()
+      .addItem('APIクォータを確認', 'checkAPIQuota')
+      .addToUi();
+    
+    Logger.log('VTuber Radarメニューを追加しました');
+  } catch (error) {
+    Logger.log(`メニュー作成エラー: ${error.message}`);
+    Logger.log('スプレッドシートIDが正しく設定されているか確認してください');
+    throw error;
+  }
+}
+
+/**
+ * チャンネル追加ダイアログを表示
+ */
+function showAddChannelDialog() {
+  // スプレッドシートを取得（Container-boundまたはStandaloneの両方に対応）
+  let ui;
+  try {
+    // まず、現在開いているスプレッドシートからUIを取得（Container-boundの場合）
+    ui = SpreadsheetApp.getUi();
+  } catch (error) {
+    // Standaloneスクリプトの場合は、ConfigからスプレッドシートIDを取得
+    try {
+      const spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+      ui = spreadsheet.getUi();
+    } catch (e) {
+      Logger.log(`UI取得エラー: ${e.message}`);
+      // フォールバック: エラーダイアログを表示
+      try {
+        SpreadsheetApp.getUi().alert('エラー', 'スプレッドシートにアクセスできません。Config.jsのSPREADSHEET_IDを確認してください。', SpreadsheetApp.getUi().ButtonSet.OK);
+      } catch (fallbackError) {
+        Logger.log(`フォールバックエラー: ${fallbackError.message}`);
+      }
+      return;
+    }
+  }
+  
+  // URL入力ダイアログを表示
+  const response = ui.prompt(
+    'チャンネルURLを追加',
+    'YouTubeチャンネルのURL、チャンネルID、またはハンドル名を入力してください：\n\n' +
+    '例:\n' +
+    '• https://www.youtube.com/@channelname\n' +
+    '• https://www.youtube.com/channel/UCxxxxxxxxxxxxx\n' +
+    '• @channelname\n' +
+    '• UCxxxxxxxxxxxxx',
+    ui.ButtonSet.OK_CANCEL
+  );
+  
+  if (response.getSelectedButton() === ui.Button.OK) {
+    const channelIdentifier = response.getResponseText().trim();
+    
+    if (!channelIdentifier) {
+      ui.alert('エラー', 'URLまたはチャンネルIDを入力してください。', ui.ButtonSet.OK);
+      return;
+    }
+    
+    // ライブ配信監視を有効にするか確認
+    const monitorResponse = ui.alert(
+      'ライブ配信監視',
+      'ライブ配信監視を有効にしますか？',
+      ui.ButtonSet.YES_NO
+    );
+    
+    const enableLiveMonitor = monitorResponse === ui.Button.YES;
+    
+    // チャンネル追加処理を実行
+    try {
+      addChannelFromMenu(channelIdentifier, enableLiveMonitor);
+      
+      // 成功メッセージ
+      ui.alert(
+        '成功',
+        'チャンネルを追加しました。\n\nスプレッドシートを更新して確認してください。',
+        ui.ButtonSet.OK
+      );
+    } catch (error) {
+      // エラーメッセージ
+      ui.alert(
+        'エラー',
+        'チャンネルの追加に失敗しました。\n\nエラー: ' + error.message + '\n\nログを確認してください。',
+        ui.ButtonSet.OK
+      );
+    }
+  }
+}
+
+/**
+ * メニューから呼び出されるチャンネル追加関数
+ * @param {string} channelIdentifier チャンネルID、ハンドル名、またはURL
+ * @param {boolean} enableLiveMonitor ライブ配信監視を有効にするか
+ */
+function addChannelFromMenu(channelIdentifier, enableLiveMonitor = false) {
+  Logger.log(`=== メニューからチャンネル追加開始: ${channelIdentifier} ===`);
+
+  const quotaTracker = new APIQuotaTracker('addChannelFromMenu');
+  const errorLogger = new ErrorLogger();
+
+  try {
+    // チャンネルIDを取得
+    const channelId = getChannelIdFromIdentifier(channelIdentifier);
+
+    if (!channelId) {
+      const errorMsg = 'チャンネルIDを取得できませんでした。URLまたはチャンネルIDが正しいか確認してください。';
+      Logger.log(`エラー: ${errorMsg}`);
+      quotaTracker.logToSheet('異常終了', errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    Logger.log(`チャンネルID: ${channelId}`);
+
+    // スプレッドシートマネージャーを初期化
+    const sheetManager = new SpreadsheetManager();
+    sheetManager.initializeSheet();
+
+    // 既存のチャンネルかチェック
+    const existingChannels = sheetManager.getExistingChannelIds();
+    if (existingChannels.has(channelId)) {
+      const info = existingChannels.get(channelId);
+      Logger.log(`このチャンネルは既に登録されています（行番号: ${info.row}）`);
+      
+      // ライブ配信監視フラグを更新するか確認
+      if (enableLiveMonitor) {
+        sheetManager.sheet.getRange(info.row, 1).setValue(true); // A列のチェックボックスをON
+        Logger.log('ライブ配信監視フラグを有効にしました');
+      }
+      
+      quotaTracker.logToSheet('正常終了');
+      return;
+    }
+
+    // チャンネル詳細を取得
+    const searcher = new YouTubeSearcher(sheetManager, quotaTracker);
+    const channelDetails = searcher.getChannelDetails([channelId]);
+
+    if (channelDetails.length === 0) {
+      const errorMsg = 'チャンネル情報を取得できませんでした。チャンネルが存在するか、または条件を満たしているか確認してください。';
+      Logger.log(`エラー: ${errorMsg}`);
+      quotaTracker.logToSheet('異常終了', errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    const channel = channelDetails[0];
+
+    // チャンネルをスプレッドシートに追加
+    sheetManager.appendChannels([channel]);
+
+    // ライブ配信監視フラグを有効にする場合は、追加後に更新
+    if (enableLiveMonitor) {
+      const addedChannels = sheetManager.getExistingChannelIds();
+      if (addedChannels.has(channelId)) {
+        const channelInfo = addedChannels.get(channelId);
+        sheetManager.sheet.getRange(channelInfo.row, 1).setValue(true); // A列のチェックボックスをON
+        Logger.log('ライブ配信監視フラグを有効にしました');
+      }
+    }
+
+    Logger.log(`=== チャンネル追加完了: ${channel.channelName} ===`);
+
+    // API使用量をログに記録（正常終了）
+    quotaTracker.logToSheet('正常終了');
+
+  } catch (error) {
+    Logger.log(`エラーが発生しました: ${error.message}`);
+    Logger.log(error.stack);
+    errorLogger.logError(error, {
+      functionName: 'addChannelFromMenu',
+      apiName: 'YouTube.Search.list / YouTube.Channels.list',
+      parameters: { channelIdentifier: channelIdentifier }
+    });
+    // API使用量をログに記録（異常終了）
+    quotaTracker.logToSheet('異常終了', error.message);
+    throw error;
+  }
+}
+
+/**
  * メインエントリーポイント
  * トリガーから実行される関数
  */
