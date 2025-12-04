@@ -10,61 +10,22 @@
  * Container-boundスクリプト（スプレッドシートに紐づいたスクリプト）の場合に自動実行される
  */
 function onOpen() {
-  createVTuberRadarMenu();
-}
-
-/**
- * VTuber Radarメニューを作成
- * Standaloneスクリプトの場合、この関数を手動で実行してメニューを追加できます
- */
-function createVTuberRadarMenu() {
-  try {
-    // スプレッドシートを取得
-    const spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-    const ui = spreadsheet.getUi();
-    
-    ui.createMenu('VTuber Radar')
-      .addItem('チャンネルをURLで追加', 'showAddChannelDialog')
-      .addSeparator()
-      .addItem('スプレッドシートを初期化', 'initializeSpreadsheet')
-      .addItem('除外キーワードシートを初期化', 'initializeExcludedKeywordsSheet')
-      .addSeparator()
-      .addItem('APIクォータを確認', 'checkAPIQuota')
-      .addToUi();
-    
-    Logger.log('VTuber Radarメニューを追加しました');
-  } catch (error) {
-    Logger.log(`メニュー作成エラー: ${error.message}`);
-    Logger.log('スプレッドシートIDが正しく設定されているか確認してください');
-    throw error;
-  }
+  SpreadsheetApp.getUi()
+    .createMenu('VTuber Radar')
+    .addItem('チャンネルをURLで追加', 'showAddChannelDialog')
+    .addSeparator()
+    .addItem('スプレッドシートを初期化', 'initializeSpreadsheet')
+    .addItem('除外キーワードシートを初期化', 'initializeExcludedKeywordsSheet')
+    .addSeparator()
+    .addItem('APIクォータを確認', 'checkAPIQuota')
+    .addToUi();
 }
 
 /**
  * チャンネル追加ダイアログを表示
  */
 function showAddChannelDialog() {
-  // スプレッドシートを取得（Container-boundまたはStandaloneの両方に対応）
-  let ui;
-  try {
-    // まず、現在開いているスプレッドシートからUIを取得（Container-boundの場合）
-    ui = SpreadsheetApp.getUi();
-  } catch (error) {
-    // Standaloneスクリプトの場合は、ConfigからスプレッドシートIDを取得
-    try {
-      const spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-      ui = spreadsheet.getUi();
-    } catch (e) {
-      Logger.log(`UI取得エラー: ${e.message}`);
-      // フォールバック: エラーダイアログを表示
-      try {
-        SpreadsheetApp.getUi().alert('エラー', 'スプレッドシートにアクセスできません。Config.jsのSPREADSHEET_IDを確認してください。', SpreadsheetApp.getUi().ButtonSet.OK);
-      } catch (fallbackError) {
-        Logger.log(`フォールバックエラー: ${fallbackError.message}`);
-      }
-      return;
-    }
-  }
+  const ui = SpreadsheetApp.getUi();
   
   // URL入力ダイアログを表示
   const response = ui.prompt(
@@ -107,9 +68,20 @@ function showAddChannelDialog() {
       );
     } catch (error) {
       // エラーメッセージ
+      const errorLogger = new ErrorLogger();
+      let errorMessage = error.message;
+      
+      // クォータエラーの場合は特別なメッセージを表示
+      if (errorLogger.isQuotaError(error)) {
+        errorMessage = 'YouTube Data APIのクォータを超過しました。\n\n' +
+          'クォータは1日10,000ユニットです。\n' +
+          '翌日まで待つか、Google Cloud Consoleでクォータを確認してください。\n\n' +
+          'https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas';
+      }
+      
       ui.alert(
         'エラー',
-        'チャンネルの追加に失敗しました。\n\nエラー: ' + error.message + '\n\nログを確認してください。',
+        'チャンネルの追加に失敗しました。\n\n' + errorMessage + '\n\nログを確認してください。',
         ui.ButtonSet.OK
       );
     }
@@ -129,7 +101,22 @@ function addChannelFromMenu(channelIdentifier, enableLiveMonitor = false) {
 
   try {
     // チャンネルIDを取得
-    const channelId = getChannelIdFromIdentifier(channelIdentifier);
+    let channelId;
+    try {
+      channelId = getChannelIdFromIdentifier(channelIdentifier);
+    } catch (error) {
+      // クォータエラーの場合は処理を中断
+      if (errorLogger.isQuotaError(error)) {
+        Logger.log('クォータエラーが発生しました。処理を中断します。');
+        quotaTracker.logToSheet('異常終了', error.message);
+        throw error; // クォータエラーを再throwして処理を中断
+      }
+      // その他のエラー
+      const errorMsg = 'チャンネルIDを取得できませんでした。URLまたはチャンネルIDが正しいか確認してください。';
+      Logger.log(`エラー: ${errorMsg}`);
+      quotaTracker.logToSheet('異常終了', errorMsg);
+      throw new Error(errorMsg);
+    }
 
     if (!channelId) {
       const errorMsg = 'チャンネルIDを取得できませんでした。URLまたはチャンネルIDが正しいか確認してください。';
@@ -194,6 +181,21 @@ function addChannelFromMenu(channelIdentifier, enableLiveMonitor = false) {
   } catch (error) {
     Logger.log(`エラーが発生しました: ${error.message}`);
     Logger.log(error.stack);
+    
+    // クォータエラーの場合は処理を中断
+    if (errorLogger.isQuotaError(error)) {
+      Logger.log('クォータエラーが発生しました。処理を中断します。');
+      errorLogger.logError(error, {
+        functionName: 'addChannelFromMenu',
+        apiName: 'YouTube.Search.list / YouTube.Channels.list',
+        parameters: { channelIdentifier: channelIdentifier }
+      });
+      quotaTracker.logToSheet('異常終了', error.message);
+      // クォータエラーを再throwして処理を中断
+      throw error;
+    }
+    
+    // その他のエラー
     errorLogger.logError(error, {
       functionName: 'addChannelFromMenu',
       apiName: 'YouTube.Search.list / YouTube.Channels.list',
@@ -542,9 +544,11 @@ function addChannelManually(channelIdentifier, enableLiveMonitor = false) {
  * チャンネル識別子（ID、ハンドル名、URL）からチャンネルIDを取得
  * @param {string} identifier チャンネルID、ハンドル名、またはURL
  * @return {string|null} チャンネルID
+ * @throws {Error} クォータエラーの場合、エラーをthrow
  */
 function getChannelIdFromIdentifier(identifier) {
   const quotaTracker = new APIQuotaTracker('getChannelIdFromIdentifier');
+  const errorLogger = new ErrorLogger();
   
   try {
     // URLの場合はハンドル名またはチャンネルIDを抽出
@@ -569,24 +573,41 @@ function getChannelIdFromIdentifier(identifier) {
       const handle = channelIdentifier.substring(1); // @ を除去
       Logger.log(`ハンドル名から検索: ${handle}`);
 
-      // YouTube Data API: search.list でハンドル名から検索
-      const response = YouTube.Search.list('snippet', {
-        q: handle,
-        type: 'channel',
-        maxResults: 1
-      });
+      try {
+        // YouTube Data API: search.list でハンドル名から検索
+        const response = YouTube.Search.list('snippet', {
+          q: handle,
+          type: 'channel',
+          maxResults: 1
+        });
 
-      // API使用量を記録
-      quotaTracker.recordAPICall('YouTube.Search.list');
+        // API使用量を記録
+        quotaTracker.recordAPICall('YouTube.Search.list');
 
-      if (response.items && response.items.length > 0) {
+        if (response.items && response.items.length > 0) {
+          quotaTracker.logToSheet('正常終了');
+          return response.items[0].id.channelId;
+        }
+
+        Logger.log('ハンドル名からチャンネルが見つかりませんでした');
         quotaTracker.logToSheet('正常終了');
-        return response.items[0].id.channelId;
+        return null;
+      } catch (apiError) {
+        // クォータエラーの場合は処理を中断
+        if (errorLogger.isQuotaError(apiError)) {
+          Logger.log('クォータエラーが発生しました。処理を中断します。');
+          errorLogger.logError(apiError, {
+            functionName: 'getChannelIdFromIdentifier',
+            apiName: 'YouTube.Search.list',
+            parameters: { identifier: identifier }
+          });
+          quotaTracker.logToSheet('異常終了', apiError.message);
+          // クォータエラーを再throwして処理を中断
+          throw new Error('YouTube Data APIのクォータを超過しました。翌日まで待つか、Google Cloud Consoleでクォータを確認してください。');
+        }
+        // その他のエラーは再throw
+        throw apiError;
       }
-
-      Logger.log('ハンドル名からチャンネルが見つかりませんでした');
-      quotaTracker.logToSheet('正常終了');
-      return null;
     }
 
     // チャンネルIDの場合はそのまま返す
@@ -600,8 +621,20 @@ function getChannelIdFromIdentifier(identifier) {
     return null;
 
   } catch (error) {
+    // クォータエラーの場合は再throwして処理を中断
+    if (errorLogger.isQuotaError(error)) {
+      Logger.log(`クォータエラー: ${error.message}`);
+      errorLogger.logError(error, {
+        functionName: 'getChannelIdFromIdentifier',
+        apiName: 'YouTube.Search.list',
+        parameters: { identifier: identifier }
+      });
+      quotaTracker.logToSheet('異常終了', error.message);
+      throw error;
+    }
+    
+    // その他のエラー
     Logger.log(`チャンネルID取得エラー: ${error.message}`);
-    const errorLogger = new ErrorLogger();
     errorLogger.logError(error, {
       functionName: 'getChannelIdFromIdentifier',
       apiName: 'YouTube.Search.list',
