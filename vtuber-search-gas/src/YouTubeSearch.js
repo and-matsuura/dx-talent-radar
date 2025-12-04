@@ -8,6 +8,7 @@ class YouTubeSearcher {
     this.startTime = new Date().getTime();
     this.foundChannels = [];
     this.sheetManager = sheetManager || new SpreadsheetManager();
+    this.errorLogger = new ErrorLogger();
 
     // 除外キーワードをスプレッドシートから取得
     this.excludedKeywords = this.sheetManager.getExcludedKeywords();
@@ -52,6 +53,11 @@ class YouTubeSearcher {
 
         } catch (error) {
           Logger.log(`検索エラー (${keyword}, ${order}): ${error.message}`);
+          this.errorLogger.logError(error, {
+            functionName: 'searchVTuberChannels',
+            apiName: 'YouTube.Search.list',
+            parameters: { keyword: keyword, order: order }
+          });
         }
       }
 
@@ -141,6 +147,16 @@ class YouTubeSearcher {
 
       } catch (error) {
         Logger.log(`検索APIエラー: ${error.message}`);
+        this.errorLogger.logError(error, {
+          functionName: 'searchByKeyword',
+          apiName: 'YouTube.Search.list',
+          parameters: { keyword: keyword, order: order, pageToken: pageToken }
+        });
+        // クォータエラーの場合は処理を中断
+        if (this.errorLogger.isQuotaError(error)) {
+          Logger.log('クォータエラーが発生しました。検索を中断します。');
+          break;
+        }
         break;
       }
 
@@ -191,6 +207,12 @@ class YouTubeSearcher {
               }
             } catch (error) {
               Logger.log(`チャンネル更新処理エラー (${channel.id}): ${error.message}`);
+              this.errorLogger.logError(error, {
+                functionName: 'getChannelDetailsForUpdate',
+                apiName: 'YouTube.Channels.list',
+                channelId: channel.id,
+                channelName: channel.snippet?.title || ''
+              });
             }
           });
         }
@@ -199,6 +221,16 @@ class YouTubeSearcher {
 
       } catch (error) {
         Logger.log(`チャンネル更新詳細取得エラー: ${error.message}`);
+        this.errorLogger.logError(error, {
+          functionName: 'getChannelDetailsForUpdate',
+          apiName: 'YouTube.Channels.list',
+          parameters: { batchSize: batch.length }
+        });
+        // クォータエラーの場合は処理を中断
+        if (this.errorLogger.isQuotaError(error)) {
+          Logger.log('クォータエラーが発生しました。更新処理を中断します。');
+          break;
+        }
       }
     }
 
@@ -258,6 +290,12 @@ class YouTubeSearcher {
               }
             } catch (error) {
               Logger.log(`チャンネルフィルタリングエラー (${channel.id}): ${error.message}`);
+              this.errorLogger.logError(error, {
+                functionName: 'getChannelDetails',
+                apiName: 'YouTube.Channels.list',
+                channelId: channel.id,
+                channelName: channel.snippet?.title || ''
+              });
             }
           });
         }
@@ -267,6 +305,16 @@ class YouTubeSearcher {
 
       } catch (error) {
         Logger.log(`チャンネル詳細取得エラー: ${error.message}`);
+        this.errorLogger.logError(error, {
+          functionName: 'getChannelDetails',
+          apiName: 'YouTube.Channels.list',
+          parameters: { batchSize: batch.length }
+        });
+        // クォータエラーの場合は処理を中断
+        if (this.errorLogger.isQuotaError(error)) {
+          Logger.log('クォータエラーが発生しました。詳細取得を中断します。');
+          break;
+        }
       }
     }
 
@@ -293,6 +341,12 @@ class YouTubeSearcher {
         }
       } catch (error) {
         Logger.log(`動画情報取得エラー (${channelInfo.channelId}): ${error.message}`);
+        this.errorLogger.logError(error, {
+          functionName: 'enrichChannelWithVideoData',
+          apiName: 'YouTube.PlaylistItems.list / YouTube.Videos.list',
+          channelId: channelInfo.channelId,
+          channelName: channelInfo.channelName
+        });
       }
 
       // 10件ごとにログ出力
@@ -501,6 +555,11 @@ class YouTubeSearcher {
         Logger.log(`プレイリスト未検出: ${uploadsPlaylistId} - チャンネルに動画がないか、非公開の可能性があります`);
       } else {
         Logger.log(`動画取得エラー (${uploadsPlaylistId}): ${error.message}`);
+        this.errorLogger.logError(error, {
+          functionName: 'getRecentVideos',
+          apiName: 'YouTube.PlaylistItems.list',
+          parameters: { uploadsPlaylistId: uploadsPlaylistId }
+        });
       }
     }
 
@@ -532,6 +591,11 @@ class YouTubeSearcher {
 
     } catch (error) {
       Logger.log(`動画詳細取得エラー: ${error.message}`);
+      this.errorLogger.logError(error, {
+        functionName: 'getVideoDetails',
+        apiName: 'YouTube.Videos.list',
+        parameters: { videoIds: videoIds.length }
+      });
     }
 
     return [];

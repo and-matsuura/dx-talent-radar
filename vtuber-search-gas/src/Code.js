@@ -13,6 +13,8 @@ function searchAndSaveVTuberChannels() {
   const startTime = new Date().getTime();
   Logger.log('=== VTuberチャンネル検索開始 ===');
 
+  const errorLogger = new ErrorLogger();
+
   try {
     // スプレッドシートマネージャーを初期化
     const sheetManager = new SpreadsheetManager();
@@ -59,6 +61,10 @@ function searchAndSaveVTuberChannels() {
   } catch (error) {
     Logger.log(`エラーが発生しました: ${error.message}`);
     Logger.log(error.stack);
+    errorLogger.logError(error, {
+      functionName: 'searchAndSaveVTuberChannels',
+      apiName: 'メイン処理'
+    });
     throw error;
   }
 }
@@ -158,6 +164,8 @@ function monitorLiveStreams() {
   const startTime = new Date().getTime();
   Logger.log('=== ライブ配信監視実行開始 ===');
 
+  const errorLogger = new ErrorLogger();
+
   try {
     const monitor = new LiveStreamMonitor();
     monitor.monitorLiveStreams();
@@ -170,6 +178,10 @@ function monitorLiveStreams() {
   } catch (error) {
     Logger.log(`エラーが発生しました: ${error.message}`);
     Logger.log(error.stack);
+    errorLogger.logError(error, {
+      functionName: 'monitorLiveStreams',
+      apiName: 'メイン処理'
+    });
     throw error;
   }
 }
@@ -352,6 +364,12 @@ function getChannelIdFromIdentifier(identifier) {
 
   } catch (error) {
     Logger.log(`チャンネルID取得エラー: ${error.message}`);
+    const errorLogger = new ErrorLogger();
+    errorLogger.logError(error, {
+      functionName: 'getChannelIdFromIdentifier',
+      apiName: 'YouTube.Search.list',
+      parameters: { identifier: identifier }
+    });
     return null;
   }
 }
@@ -418,6 +436,11 @@ function migrateToExcludeFlagColumn() {
   } catch (error) {
     Logger.log(`エラーが発生しました: ${error.message}`);
     Logger.log(error.stack);
+    const errorLogger = new ErrorLogger();
+    errorLogger.logError(error, {
+      functionName: 'migrateToExcludeFlagColumn',
+      apiName: 'スプレッドシート操作'
+    });
     throw error;
   }
 }

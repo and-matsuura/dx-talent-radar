@@ -103,6 +103,20 @@ const CONFIG = {
   EXCLUDED_KEYWORDS_HEADERS: [
     'キーワード',
     '説明'
+  ],
+
+  // エラーログシート設定
+  ERROR_LOG_SHEET_NAME: 'エラーログ',
+  ERROR_LOG_HEADERS: [
+    '日時',
+    'エラータイプ',
+    'エラーメッセージ',
+    '関数名',
+    'API名',
+    'チャンネルID',
+    'チャンネル名',
+    'パラメータ',
+    'スタックトレース'
   ]
 };
 

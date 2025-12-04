@@ -6,6 +6,7 @@
 class LiveStreamMonitor {
   constructor() {
     this.sheetManager = new SpreadsheetManager();
+    this.errorLogger = new ErrorLogger();
     this.startTime = new Date().getTime();
   }
 
@@ -77,6 +78,17 @@ class LiveStreamMonitor {
 
       } catch (error) {
         Logger.log(`チャンネル ${channel.channelName} のチェックエラー: ${error.message}`);
+        this.errorLogger.logError(error, {
+          functionName: 'monitorLiveStreams',
+          apiName: 'YouTube.Search.list / YouTube.Videos.list',
+          channelId: channel.channelId,
+          channelName: channel.channelName
+        });
+        // クォータエラーの場合は処理を中断
+        if (this.errorLogger.isQuotaError(error)) {
+          Logger.log('クォータエラーが発生しました。ライブ配信監視を中断します。');
+          break;
+        }
       }
     }
 
@@ -126,6 +138,12 @@ class LiveStreamMonitor {
       if (!error.message.includes('quotaExceeded')) {
         Logger.log(`ライブ配信チェックエラー (${channelName}): ${error.message}`);
       }
+      this.errorLogger.logError(error, {
+        functionName: 'checkLiveStream',
+        apiName: 'YouTube.Search.list',
+        channelId: channelId,
+        channelName: channelName
+      });
       return null;
     }
   }
@@ -160,6 +178,11 @@ class LiveStreamMonitor {
 
     } catch (error) {
       Logger.log(`動画詳細取得エラー (${videoId}): ${error.message}`);
+      this.errorLogger.logError(error, {
+        functionName: 'getVideoDetails',
+        apiName: 'YouTube.Videos.list',
+        parameters: { videoId: videoId }
+      });
       return null;
     }
   }
