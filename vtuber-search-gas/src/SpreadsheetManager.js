@@ -83,13 +83,13 @@ class SpreadsheetManager {
       return existingChannels;
     }
 
-    // チャンネルID（D列）と取得日時（O列 = 15列目）を取得
+    // チャンネルID（D列）と取得日時（P列 = 16列目）を取得
     const data = this.sheet.getRange(2, 1, lastRow - 1, CONFIG.SHEET_HEADERS.length).getValues();
 
     data.forEach((row, index) => {
       const excludeFlag = row[1]; // B列（除外フラグ）
       const channelId = row[3]; // D列（0-indexedで3）
-      const fetchedAt = row[14]; // O列（0-indexedで14）
+      const fetchedAt = row[15]; // P列（0-indexedで15）
 
       // 除外フラグがtrueの行はスキップ
       if (excludeFlag === true) {
@@ -137,6 +137,7 @@ class SpreadsheetManager {
       channel.channelName,
       channel.channelUrl,
       channel.subscriberCount,
+      '', // 属性（H列：初期値は空、後でバッチ処理で設定）
       channel.uploadFrequency,
       channel.avgViewCount,
       channel.avgLikeCount,
@@ -179,12 +180,13 @@ class SpreadsheetManager {
     Logger.log(`${channels.length}件のチャンネル情報を更新します`);
 
     channels.forEach(({channel, row}) => {
-      // 既存のライブ配信監視フラグ、除外フラグ、最大同時接続数、最大同時接続数日時を取得
+      // 既存のライブ配信監視フラグ、除外フラグ、属性、最大同時接続数、最大同時接続数日時を取得
       const existingData = this.sheet.getRange(row, 1, 1, CONFIG.SHEET_HEADERS.length).getValues()[0];
       const liveMonitorFlag = existingData[0]; // ライブ配信監視フラグ
       const excludeFlag = existingData[1] || false; // 除外フラグ
-      const maxViewerCount = existingData[15] || 0; // 最大同時接続数
-      const maxViewerCountDate = existingData[16] || ''; // 最大同時接続数日時
+      const attributes = existingData[7] || ''; // 属性（H列）
+      const maxViewerCount = existingData[16] || 0; // 最大同時接続数
+      const maxViewerCountDate = existingData[17] || ''; // 最大同時接続数日時
 
       // データ行を構築
       const rowData = [
@@ -195,6 +197,7 @@ class SpreadsheetManager {
         channel.channelName,
         channel.channelUrl,
         channel.subscriberCount,
+        attributes, // 既存の属性を保持
         channel.uploadFrequency,
         channel.avgViewCount,
         channel.avgLikeCount,
@@ -238,15 +241,15 @@ class SpreadsheetManager {
     excludeRange.insertCheckboxes();
 
     // 数値列の書式設定（カンマ区切り）
-    // 除外フラグ列追加により列番号が+1シフト
-    const numberColumns = [7, 9, 10, 11, 16]; // 登録者数、平均再生回数、いいね数、コメント数、最大同時接続数
+    // 属性列追加により列番号が+1シフト
+    const numberColumns = [7, 10, 11, 12, 17]; // 登録者数、平均再生回数、いいね数、コメント数、最大同時接続数
     numberColumns.forEach(col => {
       const range = this.sheet.getRange(startRow, col, numRows, 1);
       range.setNumberFormat('#,##0');
     });
 
     // 投稿頻度の書式設定（小数点1桁）
-    const frequencyRange = this.sheet.getRange(startRow, 8, numRows, 1);
+    const frequencyRange = this.sheet.getRange(startRow, 9, numRows, 1);
     frequencyRange.setNumberFormat('#,##0.0');
 
     // URLをハイパーリンクに設定、IMAGE関数を設定
@@ -268,8 +271,8 @@ class SpreadsheetManager {
         channelUrlCell.setFormula(`=HYPERLINK("${channelUrl}", "${channelName}")`);
       }
 
-      // Twitterリンクのハイパーリンク設定（N列）
-      const twitterCell = this.sheet.getRange(row, 14);
+      // Twitterリンクのハイパーリンク設定（O列）
+      const twitterCell = this.sheet.getRange(row, 15);
       const twitterLink = twitterCell.getValue();
       if (twitterLink && twitterLink !== 'N/A') {
         // URLからユーザー名を抽出（最後の/以降）
@@ -419,12 +422,12 @@ class SpreadsheetManager {
     const row = channelInfo.row;
 
     // 現在の最大同時接続数を取得
-    const currentMaxViewerCount = this.sheet.getRange(row, 16).getValue() || 0;
+    const currentMaxViewerCount = this.sheet.getRange(row, 17).getValue() || 0;
 
     // 新しい値が現在の最大値より大きい場合のみ更新
     if (viewerCount > currentMaxViewerCount) {
-      this.sheet.getRange(row, 16).setValue(viewerCount); // P列：最大同時接続数
-      this.sheet.getRange(row, 17).setValue(Utilities.formatDate(recordedAt, 'JST', 'yyyy-MM-dd HH:mm:ss')); // Q列：最大同時接続数日時
+      this.sheet.getRange(row, 17).setValue(viewerCount); // Q列：最大同時接続数
+      this.sheet.getRange(row, 18).setValue(Utilities.formatDate(recordedAt, 'JST', 'yyyy-MM-dd HH:mm:ss')); // R列：最大同時接続数日時
       Logger.log(`チャンネル ${channelId} の最大同時接続数を更新: ${viewerCount} (${Utilities.formatDate(recordedAt, 'JST', 'yyyy-MM-dd HH:mm:ss')})`);
     }
   }
@@ -671,5 +674,78 @@ class SpreadsheetManager {
     });
 
     Logger.log('行の表示/非表示を更新しました');
+  }
+
+  /**
+   * 属性管理シートを初期化
+   */
+  initializeAttributeSheet() {
+    let attributeSheet = this.spreadsheet.getSheetByName(CONFIG.ATTRIBUTE_SHEET_NAME);
+
+    if (!attributeSheet) {
+      attributeSheet = this.spreadsheet.insertSheet(CONFIG.ATTRIBUTE_SHEET_NAME);
+      Logger.log(`シート "${CONFIG.ATTRIBUTE_SHEET_NAME}" を作成しました`);
+    }
+
+    // ヘッダー行が既に存在するかチェック
+    const lastRow = attributeSheet.getLastRow();
+    if (lastRow === 0) {
+      // ヘッダー行を追加
+      attributeSheet.appendRow(CONFIG.ATTRIBUTE_HEADERS);
+
+      // ヘッダー行を太字にし、背景色を設定
+      const headerRange = attributeSheet.getRange(1, 1, 1, CONFIG.ATTRIBUTE_HEADERS.length);
+      headerRange.setFontWeight('bold');
+      headerRange.setBackground('#9c27b0');
+      headerRange.setFontColor('#ffffff');
+
+      // 列幅を自動調整
+      for (let i = 1; i <= CONFIG.ATTRIBUTE_HEADERS.length; i++) {
+        attributeSheet.autoResizeColumn(i);
+      }
+
+      // 最初の行を固定
+      attributeSheet.setFrozenRows(1);
+
+      Logger.log('属性管理シートを初期化しました');
+    }
+
+    return attributeSheet;
+  }
+
+  /**
+   * 属性管理シートから属性設定を取得
+   * @return {Array} 属性設定の配列（{filterText: フィルタ文言, attributeName: 属性名, attribute: 属性}）
+   */
+  getAttributeSettings() {
+    const attributeSheet = this.initializeAttributeSheet();
+    const attributeSettings = [];
+
+    const lastRow = attributeSheet.getLastRow();
+    if (lastRow <= 1) {
+      // ヘッダーのみまたは空のシート
+      Logger.log('属性設定がありません');
+      return attributeSettings;
+    }
+
+    // データ行を取得
+    const data = attributeSheet.getRange(2, 1, lastRow - 1, CONFIG.ATTRIBUTE_HEADERS.length).getValues();
+
+    data.forEach(row => {
+      const filterText = row[0]; // フィルタ文言
+      const attributeName = row[1]; // 属性名
+      const attribute = row[2]; // 属性
+
+      if (filterText && filterText.toString().trim() !== '') {
+        attributeSettings.push({
+          filterText: filterText.toString().trim(),
+          attributeName: attributeName ? attributeName.toString().trim() : '',
+          attribute: attribute ? attribute.toString().trim() : ''
+        });
+      }
+    });
+
+    Logger.log(`属性設定数: ${attributeSettings.length}`);
+    return attributeSettings;
   }
 }

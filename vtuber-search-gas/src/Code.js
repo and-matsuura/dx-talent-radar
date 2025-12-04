@@ -16,6 +16,7 @@ function onOpen() {
     .addSeparator()
     .addItem('スプレッドシートを初期化', 'initializeSpreadsheet')
     .addItem('除外キーワードシートを初期化', 'initializeExcludedKeywordsSheet')
+    .addItem('属性管理シートを初期化', 'initializeAttributeSheet')
     .addSeparator()
     .addItem('APIクォータを確認', 'checkAPIQuota')
     .addToUi();
@@ -286,6 +287,7 @@ function initializeSpreadsheet() {
   sheetManager.initializeSheet();
   sheetManager.initializeViewerCountSheet();
   sheetManager.initializeExcludedKeywordsSheet();
+  sheetManager.initializeAttributeSheet();
   Logger.log('スプレッドシートの初期化が完了しました');
 }
 
@@ -714,4 +716,239 @@ function migrateToExcludeFlagColumn() {
     });
     throw error;
   }
+}
+
+/**
+ * テキストからURLを削除するヘルパー関数
+ * @param {string} text 元のテキスト
+ * @return {string} URLを削除したテキスト
+ */
+function removeUrls(text) {
+  if (!text) return '';
+  
+  // URLパターンを検出して削除
+  // http://, https://, www. で始まるURL
+  // メールアドレスも除外
+  const urlPatterns = [
+    /https?:\/\/[^\s]+/gi,  // http:// または https:// で始まるURL
+    /www\.[^\s]+/gi,        // www. で始まるURL
+    /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi  // メールアドレス
+  ];
+  
+  let cleanedText = text;
+  urlPatterns.forEach(pattern => {
+    cleanedText = cleanedText.replace(pattern, ' ');
+  });
+  
+  // 連続する空白を1つに統一
+  cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+  
+  return cleanedText;
+}
+
+/**
+ * 属性チェック処理のバッチ関数
+ * 説明文内のキーワードを元に、VTuberに対して属性ラベルを振る
+ * 1日1回実行する想定
+ * URLは比較対象から除外される
+ */
+function checkAndAssignAttributes() {
+  const startTime = new Date().getTime();
+  Logger.log('=== 属性チェック処理開始 ===');
+
+  const errorLogger = new ErrorLogger();
+
+  try {
+    const sheetManager = new SpreadsheetManager();
+    const sheet = sheetManager.sheet;
+
+    // 属性設定を取得
+    const attributeSettings = sheetManager.getAttributeSettings();
+    if (attributeSettings.length === 0) {
+      Logger.log('属性設定がありません。処理をスキップします。');
+      return;
+    }
+
+    Logger.log(`属性設定数: ${attributeSettings.length}`);
+
+    // VTuberリストシートから全データを取得
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      Logger.log('データがありません。処理をスキップします。');
+      return;
+    }
+
+    const data = sheet.getRange(2, 1, lastRow - 1, CONFIG.SHEET_HEADERS.length).getValues();
+    Logger.log(`処理対象チャンネル数: ${data.length}`);
+
+    let updatedCount = 0;
+
+    // 各行を処理
+    data.forEach((row, index) => {
+      const actualRow = index + 2; // 実際の行番号（ヘッダー分+1、0-indexed分+1）
+      const excludeFlag = row[1]; // B列（除外フラグ）
+      const channelName = row[4]; // E列（チャンネル名）
+      const description = row[13]; // N列（チャンネル説明文）
+      const currentAttributes = row[7] || ''; // H列（属性）
+
+      // 除外フラグがtrueの行はスキップ
+      if (excludeFlag === true) {
+        return;
+      }
+
+      // 説明文からURLを除外して検索対象テキストを作成
+      const descriptionWithoutUrl = removeUrls(description || '');
+      const searchText = ((channelName || '') + ' ' + descriptionWithoutUrl).toLowerCase();
+
+      // 既存の属性を配列に変換（カンマ区切り）
+      const existingAttributes = currentAttributes
+        ? currentAttributes.split(',').map(attr => attr.trim()).filter(attr => attr !== '')
+        : [];
+
+      // 新しい属性を追加
+      const newAttributes = [...existingAttributes];
+
+      // 各属性設定をチェック
+      attributeSettings.forEach(setting => {
+        const filterText = setting.filterText.toLowerCase();
+        const attributeValue = setting.attribute || setting.attributeName || filterText;
+
+        // フィルタ文言が説明文またはチャンネル名に含まれているかチェック
+        if (searchText.includes(filterText)) {
+          // 既に同じ属性が設定されていないかチェック
+          if (!existingAttributes.includes(attributeValue)) {
+            newAttributes.push(attributeValue);
+            Logger.log(`チャンネル "${channelName}" に属性 "${attributeValue}" を追加（フィルタ: "${setting.filterText}"）`);
+          }
+        }
+      });
+
+      // 属性が変更された場合のみ更新
+      if (newAttributes.length !== existingAttributes.length) {
+        const attributesString = newAttributes.join(', ');
+        sheet.getRange(actualRow, 8).setValue(attributesString); // H列に属性を設定
+        updatedCount++;
+      }
+    });
+
+    const endTime = new Date().getTime();
+    const executionTime = (endTime - startTime) / 1000;
+    Logger.log(`更新されたチャンネル数: ${updatedCount}`);
+    Logger.log(`実行時間: ${executionTime}秒`);
+    Logger.log('=== 属性チェック処理完了 ===');
+
+  } catch (error) {
+    Logger.log(`エラーが発生しました: ${error.message}`);
+    Logger.log(error.stack);
+    errorLogger.logError(error, {
+      functionName: 'checkAndAssignAttributes',
+      apiName: '属性チェック処理'
+    });
+    throw error;
+  }
+}
+
+/**
+ * 手動実行用：属性管理シートの初期化
+ */
+function initializeAttributeSheet() {
+  Logger.log('属性管理シートを初期化しています...');
+  const sheetManager = new SpreadsheetManager();
+  sheetManager.initializeAttributeSheet();
+  Logger.log('属性管理シートの初期化が完了しました');
+}
+
+/**
+ * 手動実行用：既存データに属性カラムを追加（移行用）
+ * 既存のスプレッドシートにH列として属性カラムを挿入します
+ */
+function migrateToAttributeColumn() {
+  Logger.log('=== 属性カラムへの移行開始 ===');
+
+  try {
+    const sheetManager = new SpreadsheetManager();
+    const sheet = sheetManager.sheet;
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      Logger.log('データがありません。移行は不要です。');
+      return;
+    }
+
+    // 現在のヘッダーを確認
+    const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // 既に属性カラムがあるかチェック（H列 = 8列目）
+    if (currentHeaders.length >= 8 && currentHeaders[7] === '属性') {
+      Logger.log('属性カラムは既に存在します。移行は不要です。');
+      return;
+    }
+
+    Logger.log('属性カラムをH列に挿入します...');
+
+    // H列に新しい列を挿入
+    sheet.insertColumnBefore(8);
+    
+    // ヘッダー行に「属性」を設定
+    sheet.getRange(1, 8).setValue('属性');
+    sheet.getRange(1, 8).setFontWeight('bold');
+    sheet.getRange(1, 8).setBackground('#4285f4');
+    sheet.getRange(1, 8).setFontColor('#ffffff');
+
+    // データ行に空文字を設定
+    if (lastRow > 1) {
+      const attributeRange = sheet.getRange(2, 8, lastRow - 1, 1);
+      attributeRange.setValue('');
+    }
+
+    Logger.log('属性カラムの追加が完了しました');
+    Logger.log('=== 属性カラムへの移行完了 ===');
+
+  } catch (error) {
+    Logger.log(`エラーが発生しました: ${error.message}`);
+    Logger.log(error.stack);
+    const errorLogger = new ErrorLogger();
+    errorLogger.logError(error, {
+      functionName: 'migrateToAttributeColumn',
+      apiName: 'スプレッドシート操作'
+    });
+    throw error;
+  }
+}
+
+/**
+ * 属性チェック処理トリガーの設定
+ * 1日1回実行するトリガーを設定
+ */
+function setupAttributeCheckTrigger() {
+  // 既存のトリガーを削除
+  const triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(trigger => {
+    if (trigger.getHandlerFunction() === 'checkAndAssignAttributes') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+
+  // 毎日1回実行するトリガーを設定（午前3時）
+  ScriptApp.newTrigger('checkAndAssignAttributes')
+    .timeBased()
+    .everyDays(1)
+    .atHour(3)
+    .create();
+
+  Logger.log('属性チェック処理トリガーを設定しました: 毎日午前3時実行');
+}
+
+/**
+ * 属性チェック処理トリガーの削除
+ */
+function deleteAttributeCheckTrigger() {
+  const triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(trigger => {
+    if (trigger.getHandlerFunction() === 'checkAndAssignAttributes') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+
+  Logger.log('属性チェック処理トリガーを削除しました');
 }

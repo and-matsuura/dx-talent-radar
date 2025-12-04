@@ -330,6 +330,15 @@
       flex-shrink: 0;
     }
     
+    .channel-name-wrapper {
+      flex: 1;
+      min-width: 0;
+      margin-right: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    
     .channel-card-main {
       display: flex;
       align-items: center;
@@ -348,10 +357,9 @@
       text-align: center;
     }
     
-    .channel-card-main .channel-name {
-      flex: 1;
-      min-width: 0;
-      margin-right: auto;
+    .channel-card-main .channel-name-wrapper .channel-name {
+      flex: 0;
+      margin-right: 0;
     }
     
     .channel-card-main .channel-stat {
@@ -398,6 +406,26 @@
       font-size: 10px;
       font-weight: 500;
       color: var(--accent-primary);
+    }
+    
+    .attribute-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      background: rgba(156, 39, 176, 0.15);
+      border: 1px solid rgba(156, 39, 176, 0.5);
+      border-radius: var(--radius-full);
+      font-size: 10px;
+      font-weight: 500;
+      color: #9c27b0;
+      white-space: nowrap;
+    }
+    
+    .attribute-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+      margin-top: 2px;
     }
     
     /* Channel Flags */
@@ -1022,6 +1050,17 @@
           const rankClass = ch.rank <= 3 ? 'top-3' : '';
           const badge = ch.liveMonitor ? '<span class="live-badge">監視中</span>' : '';
           
+          // 属性バッジの生成
+          let attributeBadgesHtml = '';
+          if (ch.attributes && ch.attributes.trim() !== '') {
+            const attributes = ch.attributes.split(',').map(attr => attr.trim()).filter(attr => attr !== '');
+            if (attributes.length > 0) {
+              attributeBadgesHtml = '<div class="attribute-badges">' + 
+                attributes.map(attr => '<span class="attribute-badge">' + escapeHtml(attr) + '</span>').join('') + 
+                '</div>';
+            }
+          }
+          
           // 最大同時接続数日時の表示
           const maxViewerCountDateHtml = ch.maxViewerCountDate && ch.maxViewerCountDate !== '' 
             ? '<span class="stat-date">' + escapeHtml(formatDate(ch.maxViewerCountDate)) + '</span>' 
@@ -1039,7 +1078,10 @@
             '<div class="channel-card-main">' +
             '<span class="rank ' + rankClass + '">' + ch.rank + '</span>' +
             '<img class="channel-avatar" src="' + thumb + '" alt="" onerror="this.style.display=\'none\'">' +
+            '<div class="channel-name-wrapper">' +
             '<span class="channel-name" data-subs="' + formatNumber(ch.subscriberCount) + '">' + name + '</span>' +
+            (attributeBadgesHtml ? attributeBadgesHtml : '') +
+            '</div>' +
             '<span class="channel-stat"><span class="stat-num">' + formatNumber(ch.subscriberCount) + '</span><span class="stat-label-sm">登録者</span></span>' +
             '<span class="channel-stat"><span class="stat-num">' + formatNumber(ch.avgViewCount) + '</span><span class="stat-label-sm">平均再生</span></span>' +
             '<span class="channel-stat"><span class="stat-num">' + formatNumber(ch.maxViewerCount) + '</span><span class="stat-label-sm">最大同接</span>' + maxViewerCountDateHtml + '</span>' +
@@ -1056,6 +1098,7 @@
             '<div class="detail-item"><div class="detail-label">投稿頻度</div><div class="detail-value">' + (ch.uploadFrequency ? ch.uploadFrequency.toFixed(1) : '0.0') + '本/月</div></div>' +
             '<div class="detail-item"><div class="detail-label">最大同時接続数</div><div class="detail-value">' + formatNumber(ch.maxViewerCount) + '人' + (ch.maxViewerCountDate && ch.maxViewerCountDate !== '' ? ' (' + escapeHtml(formatDate(ch.maxViewerCountDate)) + ')' : '') + '</div></div>' +
             '<div class="detail-item"><div class="detail-label">最終投稿日</div><div class="detail-value">' + (ch.lastPublishedAt ? escapeHtml(formatDate(ch.lastPublishedAt)) : 'N/A') + '</div></div>' +
+            (attributeBadgesHtml ? '<div class="detail-item"><div class="detail-label">属性</div><div class="detail-value">' + attributeBadgesHtml + '</div></div>' : '') +
             '<div class="detail-item detail-description"><div class="detail-label">チャンネル説明文</div><div class="detail-value">' + escapeHtmlWithBreaks(description) + '</div></div>' +
             '<div class="detail-item"><div class="detail-label">設定</div><div class="detail-value"><div class="channel-flags">' +
             '<label class="channel-flag live-monitor" onclick="event.stopPropagation()">' +

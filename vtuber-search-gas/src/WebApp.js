@@ -99,17 +99,18 @@ function getChannelsApi(params) {
     // F列（チャンネルURL）: 式からURLを抽出、または値をそのまま使用
     channelUrl: String(extractHyperlinkUrl(formulas[index][5]) || extractHyperlinkUrl(row[5]) || `https://www.youtube.com/channel/${row[3]}`),
     subscriberCount: Number(row[6]) || 0,
-    uploadFrequency: Number(row[7]) || 0,
-    avgViewCount: Number(row[8]) || 0,
-    avgLikeCount: Number(row[9]) || 0,
-    avgCommentCount: Number(row[10]) || 0,
-    lastPublishedAt: formatDateValue(row[11]),
-    description: String(row[12] || ''),
-    // N列（Twitter）: 式からURLを抽出、または値をそのまま使用
-    twitterLink: String(extractHyperlinkUrl(formulas[index][13]) || extractHyperlinkUrl(row[13]) || row[13] || ''),
-    fetchedAt: formatDateValue(row[14]),
-    maxViewerCount: Number(row[15]) || 0,
-    maxViewerCountDate: formatDateValue(row[16])
+    attributes: String(row[7] || ''), // H列（属性）
+    uploadFrequency: Number(row[8]) || 0,
+    avgViewCount: Number(row[9]) || 0,
+    avgLikeCount: Number(row[10]) || 0,
+    avgCommentCount: Number(row[11]) || 0,
+    lastPublishedAt: formatDateValue(row[12]),
+    description: String(row[13] || ''),
+    // O列（Twitter）: 式からURLを抽出、または値をそのまま使用
+    twitterLink: String(extractHyperlinkUrl(formulas[index][14]) || extractHyperlinkUrl(row[14]) || row[14] || ''),
+    fetchedAt: formatDateValue(row[15]),
+    maxViewerCount: Number(row[16]) || 0,
+    maxViewerCountDate: formatDateValue(row[17])
   })).filter(ch => {
     if (!ch.channelId) return false;
     // 除外者のみ表示モード
@@ -231,7 +232,7 @@ function getStatsApi() {
     if (row[3]) { // チャンネルIDがある場合（D列）
       validCount++;
       totalSubscribers += Number(row[6]) || 0; // 登録者数（G列）
-      totalAvgViews += Number(row[8]) || 0; // 平均再生回数（I列）
+      totalAvgViews += Number(row[9]) || 0; // 平均再生回数（J列）
       if (row[0] === true) {
         liveMonitorCount++;
       }
