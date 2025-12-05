@@ -166,7 +166,7 @@ class YouTubeSearcher {
         break;
       }
 
-    } while (pageToken && pageCount < 20); // 最大20ページ
+    } while (pageToken && pageCount < CONFIG.MAX_SEARCH_PAGES); // 最大ページ数（Config.jsで設定）
 
     return channelIds;
   }

@@ -15,7 +15,7 @@ const CONFIG = {
   // YouTube検索設定
   SEARCH_KEYWORDS: [
     'VTuber 個人勢',
-    '新人VTuber'
+    // '新人VTuber'
   ],
 
   // 検索順序（複数指定可能）
@@ -57,6 +57,7 @@ const CONFIG = {
   // 動画一覧: 1ユニット/リクエスト
   // 動画詳細: 1ユニット/リクエスト
   ESTIMATED_QUOTA_PER_CHANNEL: 15, // 1チャンネルあたりの推定クォータ使用量
+  MAX_SEARCH_PAGES: 3, // Search.listの最大ページ数（1ページ=100クォータ、一時的に抑制中）
 
   // 実行時間制限対策
   MAX_EXECUTION_TIME: 330, // 秒（5分30秒）GASの6分制限に対するバッファ

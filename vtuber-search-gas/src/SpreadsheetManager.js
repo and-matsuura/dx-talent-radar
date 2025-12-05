@@ -232,52 +232,71 @@ class SpreadsheetManager {
    * @param {number} numRows 行数
    */
   formatDataRows(startRow, numRows) {
-    // ライブ配信監視列のチェックボックス設定（A列）
-    const monitorRange = this.sheet.getRange(startRow, 1, numRows, 1);
-    monitorRange.insertCheckboxes();
-
-    // 除外フラグ列のチェックボックス設定（B列）
-    const excludeRange = this.sheet.getRange(startRow, 2, numRows, 1);
-    excludeRange.insertCheckboxes();
+    // A列・B列のチェックボックスはスプレッドシートのテーブル機能で管理されているため、
+    // GASからの設定は行わない
 
     // 数値列の書式設定（カンマ区切り）
     // 属性列追加により列番号が+1シフト
     const numberColumns = [7, 10, 11, 12, 17]; // 登録者数、平均再生回数、いいね数、コメント数、最大同時接続数
     numberColumns.forEach(col => {
-      const range = this.sheet.getRange(startRow, col, numRows, 1);
-      range.setNumberFormat('#,##0');
+      try {
+        const range = this.sheet.getRange(startRow, col, numRows, 1);
+        range.clearDataValidations();
+        range.setNumberFormat('#,##0');
+      } catch (e) {
+        Logger.log(`列${col}の数値フォーマット設定エラー: ${e.message}`);
+      }
     });
 
     // 投稿頻度の書式設定（小数点1桁）
-    const frequencyRange = this.sheet.getRange(startRow, 9, numRows, 1);
-    frequencyRange.setNumberFormat('#,##0.0');
+    try {
+      const frequencyRange = this.sheet.getRange(startRow, 9, numRows, 1);
+      frequencyRange.clearDataValidations();
+      frequencyRange.setNumberFormat('#,##0.0');
+    } catch (e) {
+      Logger.log(`投稿頻度フォーマット設定エラー: ${e.message}`);
+    }
 
     // URLをハイパーリンクに設定、IMAGE関数を設定
+    Logger.log(`formatDataRows: 行 ${startRow} から ${numRows} 行を書式設定中...`);
+    
     for (let i = 0; i < numRows; i++) {
       const row = startRow + i;
 
       // チャンネルアイコン（C列）をIMAGE関数で表示
       const iconCell = this.sheet.getRange(row, 3);
-      const iconUrl = iconCell.getValue();
-      if (iconUrl) {
+      const iconUrl = String(iconCell.getValue() || '');
+      Logger.log(`行 ${row} C列: iconUrl = "${iconUrl.substring(0, 50)}..."`);
+      
+      if (iconUrl && iconUrl.startsWith('http')) {
+        // 型付きセル（チェックボックスなど）のデータ検証をクリアしてから数式を設定
+        iconCell.clearDataValidations();
         iconCell.setFormula(`=IMAGE("${iconUrl}", 1)`);
+        Logger.log(`行 ${row}: IMAGE関数を設定しました`);
       }
 
       // チャンネルURL（F列）
       const channelUrlCell = this.sheet.getRange(row, 6);
-      const channelUrl = channelUrlCell.getValue();
-      if (channelUrl) {
+      const channelUrl = String(channelUrlCell.getValue() || '');
+      if (channelUrl && channelUrl.startsWith('http')) {
         const channelName = this.sheet.getRange(row, 5).getValue();
-        channelUrlCell.setFormula(`=HYPERLINK("${channelUrl}", "${channelName}")`);
+        // チャンネル名の特殊文字をエスケープ
+        const escapedName = String(channelName || '').replace(/"/g, '""');
+        channelUrlCell.clearDataValidations(); // 型付きセルエラー防止
+        channelUrlCell.setFormula(`=HYPERLINK("${channelUrl}", "${escapedName}")`);
       }
 
       // Twitterリンクのハイパーリンク設定（O列）
       const twitterCell = this.sheet.getRange(row, 15);
-      const twitterLink = twitterCell.getValue();
-      if (twitterLink && twitterLink !== 'N/A') {
+      const twitterLink = String(twitterCell.getValue() || '');
+      Logger.log(`行 ${row} O列: twitterLink = "${twitterLink}"`);
+      
+      if (twitterLink && twitterLink.startsWith('http') && twitterLink !== 'N/A') {
         // URLからユーザー名を抽出（最後の/以降）
         const username = twitterLink.split('/').pop();
+        twitterCell.clearDataValidations(); // 型付きセルエラー防止
         twitterCell.setFormula(`=HYPERLINK("${twitterLink}", "@${username}")`);
+        Logger.log(`行 ${row}: TwitterリンクのHYPERLINK関数を設定しました`);
       }
 
       // 除外フラグがtrueの場合は行を非表示にする

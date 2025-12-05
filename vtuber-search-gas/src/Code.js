@@ -822,7 +822,10 @@ function checkAndAssignAttributes() {
       // 属性が変更された場合のみ更新
       if (newAttributes.length !== existingAttributes.length) {
         const attributesString = newAttributes.join(', ');
-        sheet.getRange(actualRow, 8).setValue(attributesString); // H列に属性を設定
+        const attributeCell = sheet.getRange(actualRow, 8);
+        // 型付きセル（チェックボックスなど）のデータ検証をクリアしてから値を設定
+        attributeCell.clearDataValidations();
+        attributeCell.setValue(attributesString); // H列に属性を設定
         updatedCount++;
       }
     });
@@ -947,4 +950,100 @@ function deleteAttributeCheckTrigger() {
   });
 
   Logger.log('属性チェック処理トリガーを削除しました');
+}
+
+/**
+ * 手動実行用：セルの書式を修復
+ * エラー等で処理が中断された場合に、チェックボックス、IMAGE関数、HYPERLINK関数を再設定します
+ */
+function repairCellFormulas() {
+  Logger.log('=== セル書式修復開始 ===');
+
+  try {
+    const sheetManager = new SpreadsheetManager();
+    const sheet = sheetManager.sheet;
+    const lastRow = sheet.getLastRow();
+
+    if (lastRow <= 1) {
+      Logger.log('データがありません。修復は不要です。');
+      return;
+    }
+
+    // A列・B列のチェックボックスはスプレッドシートのテーブル機能で管理されているため、
+    // GASからの設定は行わない
+
+    let iconRepairedCount = 0;
+    let twitterRepairedCount = 0;
+    let channelUrlRepairedCount = 0;
+
+    // データ行を処理（2行目から）
+    for (let row = 2; row <= lastRow; row++) {
+      // C列：アイコンIMAGE関数の修復
+      const iconCell = sheet.getRange(row, 3);
+      const iconValue = iconCell.getValue();
+      const iconFormula = iconCell.getFormula();
+
+      if (!iconFormula || !iconFormula.startsWith('=IMAGE')) {
+        if (iconValue && String(iconValue).startsWith('http')) {
+          iconCell.clearDataValidations();
+          iconCell.setFormula(`=IMAGE("${iconValue}", 1)`);
+          iconRepairedCount++;
+          Logger.log(`行 ${row}: アイコンIMAGE関数を設定しました`);
+        }
+      }
+
+      // F列：チャンネルURLのHYPERLINK関数の修復
+      const channelUrlCell = sheet.getRange(row, 6);
+      const channelUrlValue = channelUrlCell.getValue();
+      const channelUrlFormula = channelUrlCell.getFormula();
+
+      if (!channelUrlFormula || !channelUrlFormula.startsWith('=HYPERLINK')) {
+        if (channelUrlValue && String(channelUrlValue).includes('youtube.com')) {
+          const channelName = sheet.getRange(row, 5).getValue(); // E列：チャンネル名
+          if (channelName) {
+            channelUrlCell.clearDataValidations();
+            // チャンネル名の特殊文字をエスケープ
+            const escapedName = String(channelName).replace(/"/g, '""');
+            channelUrlCell.setFormula(`=HYPERLINK("${channelUrlValue}", "${escapedName}")`);
+            channelUrlRepairedCount++;
+            Logger.log(`行 ${row}: チャンネルURLのHYPERLINK関数を設定しました`);
+          }
+        }
+      }
+
+      // O列：TwitterリンクのHYPERLINK関数の修復
+      const twitterCell = sheet.getRange(row, 15);
+      const twitterValue = twitterCell.getValue();
+      const twitterFormula = twitterCell.getFormula();
+
+      if (!twitterFormula || !twitterFormula.startsWith('=HYPERLINK')) {
+        if (twitterValue && String(twitterValue).includes('twitter.com') || String(twitterValue).includes('x.com')) {
+          const twitterUrl = String(twitterValue);
+          if (twitterUrl !== 'N/A' && twitterUrl.startsWith('http')) {
+            // URLからユーザー名を抽出（最後の/以降）
+            const username = twitterUrl.split('/').pop();
+            twitterCell.clearDataValidations();
+            twitterCell.setFormula(`=HYPERLINK("${twitterUrl}", "@${username}")`);
+            twitterRepairedCount++;
+            Logger.log(`行 ${row}: TwitterリンクのHYPERLINK関数を設定しました`);
+          }
+        }
+      }
+    }
+
+    // 行の高さを設定
+    if (iconRepairedCount > 0) {
+      sheet.setRowHeights(2, lastRow - 1, 80);
+    }
+
+    Logger.log(`アイコン修復数: ${iconRepairedCount}`);
+    Logger.log(`チャンネルURL修復数: ${channelUrlRepairedCount}`);
+    Logger.log(`Twitterリンク修復数: ${twitterRepairedCount}`);
+    Logger.log('=== セル書式修復完了 ===');
+
+  } catch (error) {
+    Logger.log(`エラーが発生しました: ${error.message}`);
+    Logger.log(error.stack);
+    throw error;
+  }
 }
